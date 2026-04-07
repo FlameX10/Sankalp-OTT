@@ -1,14 +1,15 @@
-const express = require('express');
-const router = express.Router();
-const ctrl = require('./content.controller');
-const { devAdmin } = require('../../middleware/dev-admin.middleware');
-const { validate } = require('../../middleware/validate.middleware');
-const {
+import express from 'express';
+import * as ctrl from './content.controller.js';
+import { devAdmin } from '../../middleware/dev-admin.middleware.js';
+import { validate } from '../../middleware/validate.middleware.js';
+import {
   createCategorySchema, updateCategorySchema,
   createTagSchema, updateTagSchema,
   createShowSchema, updateShowSchema,
   createEpisodeSchema, updateEpisodeSchema,
-} = require('./content.validation');
+} from './content.validation.js';
+
+const router = express.Router();
 
 // ── Categories ──
 router.get('/categories', ctrl.getCategories);
@@ -38,7 +39,7 @@ router.post('/episodes', devAdmin('Dramas'), validate(createEpisodeSchema), ctrl
 router.put('/episodes/:id', devAdmin('Dramas'), validate(updateEpisodeSchema), ctrl.updateEpisode);
 router.delete('/episodes/:id', devAdmin('Dramas'), ctrl.deleteEpisode);
 
-module.exports = router;
+export default router;
 
 /* After access
 const express = require('express');

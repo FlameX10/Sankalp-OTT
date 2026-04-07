@@ -1,5 +1,7 @@
-const mediaService = require('./media.service');
-const { getPresignedGetUrl } = require('../../utils/presigned-url');
+import * as mediaService from './media.service.js';
+import { getPresignedGetUrl } from '../../utils/presigned-url.js';
+import http from 'http';
+import https from 'https';
 
 async function getVideoUploadUrl(req, res, next) {
   try {
@@ -54,8 +56,6 @@ async function getTranscodeStatus(req, res, next) {
 
 // Proxy HLS segments — generates presigned URLs for .m3u8 and .ts files
 // This solves the CORS/auth issue: the player fetches from our API, we redirect to MinIO
-// top of media.controller.js
-const http = require('http');
 
 async function hlsProxy(req, res, next) {
   try {
@@ -66,8 +66,8 @@ async function hlsProxy(req, res, next) {
     const presignedUrl = await getPresignedGetUrl(objectName, 7200);
 
     if (filename.endsWith('.m3u8')) {
-      const http = require('http');
-      http.get(presignedUrl, (stream) => {
+      const protocolModule = presignedUrl.startsWith('https') ? https : http;
+      protocolModule.get(presignedUrl, (stream) => {
         let body = '';
         stream.on('data', chunk => body += chunk);
         stream.on('end', async () => {
@@ -98,7 +98,7 @@ async function hlsProxy(req, res, next) {
   } catch (e) { next(e); }
 }
 
-module.exports = {
+export {
   getVideoUploadUrl, uploadVideo, getImageUploadUrl, confirmVideoUpload,
   confirmImageUpload, getPlayUrl, getTranscodeStatus, hlsProxy,
 };

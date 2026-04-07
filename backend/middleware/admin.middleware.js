@@ -1,5 +1,5 @@
-const { verifyAccessToken } = require('../utils/jwt');
-const { prisma } = require('../prisma/client');
+import { verifyAccessToken } from '../utils/jwt.js';
+import { prisma } from '../prisma/client.js';
 
 // Requires admin or sub_admin role. For sub_admins, checks section access.
 function requireAdmin(section = null) {
@@ -40,4 +40,4 @@ function requireAdmin(section = null) {
   };
 }
 
-module.exports = { requireAdmin };
+export { requireAdmin };

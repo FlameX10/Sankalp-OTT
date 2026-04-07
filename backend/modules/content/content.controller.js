@@ -1,4 +1,4 @@
-const service = require('./content.service');
+import * as service from './content.service.js';
 
 // ── Categories ──
 async function getCategories(req, res, next) {
@@ -72,7 +72,7 @@ async function deleteEpisode(req, res, next) {
   try { res.json(await service.deleteEpisode(req.params.id)); } catch (e) { next(e); }
 }
 
-module.exports = {
+export {
   getCategories, createCategory, updateCategory, deleteCategory,
   getTags, createTag, updateTag, deleteTag,
   getShows, getShow, createShow, updateShow, deleteShow, togglePublish, toggleFeatured,

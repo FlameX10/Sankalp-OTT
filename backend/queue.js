@@ -1,8 +1,8 @@
-const { Queue } = require('bullmq');
-const redis = require('./config/redis');
+import { Queue } from 'bullmq';
+import redis from './config/redis.js';
 
 const transcodeQueue = new Queue('transcode-queue', {
   connection: redis,
 });
 
-module.exports = transcodeQueue;
+export default transcodeQueue;

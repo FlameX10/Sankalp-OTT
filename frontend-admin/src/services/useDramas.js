@@ -78,7 +78,15 @@ export function useDramas() {
             await uploadEpisodeVideo(showId, epRes.data.id, ep.videoFile)
             console.log('Video uploaded for episode:', epRes.data.id)
           } catch (uploadErr) {
-            console.error('Video upload failed (episode still saved):', uploadErr)
+            console.error('Video upload failed. Deleting episode:', uploadErr)
+            // Rollback: delete the episode since video upload failed
+            try {
+              await episodesApi.delete(epRes.data.id)
+              console.log('Episode deleted due to failed upload:', epRes.data.id)
+            } catch (deleteErr) {
+              console.error('Failed to rollback episode deletion:', deleteErr)
+            }
+            throw new Error(`Video upload failed for episode "${ep.title}": ${uploadErr.message}`)
           }
         }
       } catch (epErr) {

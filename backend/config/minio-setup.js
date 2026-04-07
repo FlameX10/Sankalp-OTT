@@ -1,5 +1,5 @@
-const minioClient = require('./minio');
-const config = require('./index');
+import minioClient from './minio.js';
+import config from './index.js';
 
 async function setupMinioBuckets() {
   const bucket = config.minio.bucket;
@@ -43,4 +43,4 @@ async function setupMinioBuckets() {
   }
 }
 
-setupMinioBuckets();
+await setupMinioBuckets();

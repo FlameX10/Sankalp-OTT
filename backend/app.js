@@ -1,8 +1,11 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const { errorHandler } = require('./middleware/error.middleware');
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import { errorHandler } from './middleware/error.middleware.js';
+import contentRouter from './modules/content/content.router.js';
+import feedRouter from './modules/content/feed.router.js';
+import mediaRouter from './modules/media/media.router.js';
 
 const app = express();
 
@@ -24,7 +27,9 @@ app.use(cors({
   origin: ['http://localhost:5173', 'http://localhost:8081', 'http://localhost:19006'],
   credentials: true,
 }));
-app.use(express.json({ limit: '10mb' }));
+// Configure body parsers with higher limits for file uploads
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(morgan('dev'));
 
 // Serve web reels player
@@ -40,20 +45,20 @@ app.get('/api/health', (req, res) => {
 });
 
 // ── Routes ──
-// app.use('/api/auth', require('./modules/auth/auth.router'));
-// app.use('/api/users', require('./modules/users/users.router'));
-app.use('/api/content', require('./modules/content/content.router'));
-app.use('/api/feed', require('./modules/content/feed.router'));
-// app.use('/api/home', require('./modules/content/home.router'));
-// app.use('/api/coins', require('./modules/coins/coins.router'));
-// app.use('/api/payments', require('./modules/payments/payments.router'));
-app.use('/api/media', require('./modules/media/media.router'));
-// app.use('/api/notifications', require('./modules/notifications/notifications.router'));
-// app.use('/api/search', require('./modules/search/search.router'));
-// app.use('/api/banners', require('./modules/banners/banners.router'));
-// app.use('/api/playlists', require('./modules/playlists/playlists.router'));
-// app.use('/api/ratings', require('./modules/ratings/ratings.router'));
-// app.use('/api/admin', require('./modules/admin/admin.router'));
+// app.use('/api/auth', authRouter);
+// app.use('/api/users', usersRouter);
+app.use('/api/content', contentRouter);
+app.use('/api/feed', feedRouter);
+// app.use('/api/home', homeRouter);
+// app.use('/api/coins', coinsRouter);
+// app.use('/api/payments', paymentsRouter);
+app.use('/api/media', mediaRouter);
+// app.use('/api/notifications', notificationsRouter);
+// app.use('/api/search', searchRouter);
+// app.use('/api/banners', bannersRouter);
+// app.use('/api/playlists', playlistsRouter);
+// app.use('/api/ratings', ratingsRouter);
+// app.use('/api/admin', adminRouter);
 
 // ── 404 handler ──
 app.use((req, res) => {
@@ -63,4 +68,4 @@ app.use((req, res) => {
 // ── Global error handler (must be last) ──
 app.use(errorHandler);
 
-module.exports = app;
+export default app;

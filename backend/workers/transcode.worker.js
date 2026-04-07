@@ -1,14 +1,13 @@
-const { Worker } = require('bullmq');
-const { spawn } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-
-const redis = require('../config/redis');
-const minioClient = require('../config/minio');
-const config = require('../config');
-const { prisma } = require('../prisma/client');
-const { createMasterPlaylist } = require('../master');
+import { Worker } from 'bullmq';
+import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import redis from '../config/redis.js';
+import minioClient from '../config/minio.js';
+import config from '../config/index.js';
+import { prisma } from '../prisma/client.js';
+import { createMasterPlaylist } from '../master.js';
 
 const BUCKET = config.minio.bucket;
 const TEMP_DIR = path.join(os.tmpdir(), 'ott-transcode');
@@ -71,11 +70,15 @@ async function processJob(job) {
   const inputPath = path.join(workDir, 'input.mp4');
 
   try {
+    console.log(`[Worker] 📹 Starting transcoding for ${profile}...`);
+    
     if (!fs.existsSync(workDir)) fs.mkdirSync(workDir, { recursive: true });
 
     // Download once
     if (!fs.existsSync(inputPath)) {
+      console.log(`[Worker] ⬇️  Downloading video from MinIO...`);
       await downloadFromMinio(objectName, inputPath);
+      console.log(`[Worker] ✅ Video downloaded`);
     }
 
     const hlsDir = path.join(workDir, 'hls');
@@ -96,10 +99,13 @@ async function processJob(job) {
       '-y', playlistPath,
     ];
 
+    console.log(`[Worker] 🎬 FFmpeg encoding ${profile} - bitrate ${p.bitrate}...`);
     await runFfmpeg(args);
+    console.log(`[Worker] ✅ FFmpeg encoding complete for ${profile}`);
 
     // Upload files
     const files = fs.readdirSync(hlsDir).filter(f => f.startsWith(p.name));
+    console.log(`[Worker] 📤 Uploading ${files.length} files for ${profile}...`);
 
     for (const file of files) {
       const localFile = path.join(hlsDir, file);
@@ -110,6 +116,7 @@ async function processJob(job) {
 
       await uploadToMinio(localFile, minioPath, ct);
     }
+    console.log(`[Worker] ✅ All files uploaded for ${profile}`);
 
     // Update DB
     const episode = await prisma.episode.update({
@@ -130,7 +137,12 @@ async function processJob(job) {
     return { episodeId, profile };
 
   } catch (err) {
-    console.error(err);
+    console.error(`[Worker] ❌ Error processing ${profile}:`, {
+      profile,
+      episodeId,
+      error: err.message,
+      stack: err.stack
+    });
     throw err;
   }
 }
@@ -139,19 +151,37 @@ async function processJob(job) {
 
 const worker = new Worker('transcode-queue', processJob, {
   connection: redis,
-  concurrency: 4,
+  concurrency: 4, // Reduce to 2 for CPU-intensive FFmpeg tasks
+  lockDuration: 30 * 60 * 1000, // 30 minutes - long enough for transcoding
+  lockRenewTime: 5 * 60 * 1000, // Renew lock every 5 minutes
+  maxStalledCount: 2, // Allow 2 stall attempts before failing
+  stalledInterval: 30 * 1000, // Check for stalled jobs every 30 seconds
 });
 
-console.log('Worker started...');
-
-worker.on('completed', (job, result) => {
-  console.log(`[Worker] Job ${job.id} completed:`, result);
-});
-
-worker.on('failed', (job, err) => {
-  console.error(`[Worker] Job ${job.id} failed:`, err.message);
-});
+console.log('[Worker] Transcode worker starting...');
 
 worker.on('ready', () => {
   console.log('[Worker] Transcode worker ready, waiting for jobs...');
 });
+
+worker.on('completed', (job, result) => {
+  console.log(`[Worker] ✅ Job ${job.id} completed:`, result);
+});
+
+worker.on('failed', (job, err) => {
+  console.error(`[Worker] ❌ Job ${job.id} FAILED:`, {
+    profile: job.data?.profile,
+    episode: job.data?.episodeId,
+    error: err.message,
+    stack: err.stack
+  });
+});
+
+worker.on('stalled', (jobId) => {
+  console.error(`[Worker] ⚠️  Job ${jobId} STALLED - potentially hung process`);
+});
+
+worker.on('error', (err) => {
+  console.error('[Worker] ⚠️  Worker error:', err.message);
+});
+

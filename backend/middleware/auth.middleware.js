@@ -1,4 +1,4 @@
-const { verifyAccessToken } = require('../utils/jwt');
+import { verifyAccessToken } from '../utils/jwt.js';
 
 // Requires valid JWT. Rejects guests. Sets req.user
 function requireAuth(req, res, next) {
@@ -42,4 +42,4 @@ function allowGuest(req, res, next) {
   }
 }
 
-module.exports = { requireAuth, allowGuest };
+export { requireAuth, allowGuest };

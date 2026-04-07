@@ -1,10 +1,9 @@
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-
-const minioClient = require('./config/minio');
-const config = require('./config');
-const { prisma } = require('./prisma/client');
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import minioClient from './config/minio.js';
+import config from './config/index.js';
+import { prisma } from './prisma/client.js';
 
 const BUCKET = config.minio.bucket;
 const TEMP_DIR = path.join(os.tmpdir(), 'ott-transcode');
@@ -48,4 +47,4 @@ async function createMasterPlaylist(episodeId) {
   fs.unlinkSync(tempPath);
 }
 
-module.exports = { createMasterPlaylist };
+export { createMasterPlaylist };

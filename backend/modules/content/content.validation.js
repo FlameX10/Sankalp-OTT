@@ -1,4 +1,4 @@
-const Joi = require('joi');
+import Joi from 'joi';
 
 const createCategorySchema = Joi.object({
   name: Joi.string().min(1).max(100).required(),
@@ -61,7 +61,7 @@ const updateEpisodeSchema = Joi.object({
   duration_sec: Joi.number().integer().min(0),
 }).min(1);
 
-module.exports = {
+export {
   createCategorySchema, updateCategorySchema,
   createTagSchema, updateTagSchema,
   createShowSchema, updateShowSchema,

@@ -1,5 +1,5 @@
-const { prisma } = require('../../prisma/client');
-const { AppError } = require('../../middleware/error.middleware');
+import { prisma } from '../../prisma/client.js';
+import { AppError } from '../../middleware/error.middleware.js';
 
 // ═══════════════════════════════════════
 // CATEGORIES
@@ -295,7 +295,7 @@ async function deleteEpisode(id) {
   return { deleted: true };
 }
 
-module.exports = {
+export {
   getAllCategories, getCategoryById, createCategory, updateCategory, deleteCategory,
   getAllTags, createTag, updateTag, deleteTag,
   getAllShows, getShowById, createShow, updateShow, deleteShow, toggleShowPublish, toggleShowFeatured,

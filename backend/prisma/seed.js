@@ -1,6 +1,6 @@
-const { prisma } = require('./client');
-const bcrypt = require('bcrypt');
-const config = require('../config');
+import { prisma } from './client.js';
+import bcrypt from 'bcrypt';
+import config from '../config/index.js';
 
 async function seed() {
   console.log('Seeding database...\n');
@@ -98,7 +98,7 @@ for (let i = 0; i < categories.length; i++) {
   console.log('\nSeed complete!');
 }
 
-seed()
+await seed();
   .then(() => prisma.$disconnect())
   .catch((err) => {
     console.error('Seed failed:', err);

@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
-const config = require('../config');
+import jwt from 'jsonwebtoken';
+import config from '../config/index.js';
 
 function generateAccessToken(user) {
   return jwt.sign(
@@ -33,7 +33,7 @@ function verifyRefreshToken(token) {
   return jwt.verify(token, config.jwtRefreshSecret);
 }
 
-module.exports = {
+export {
   generateAccessToken,
   generateRefreshToken,
   generateGuestToken,

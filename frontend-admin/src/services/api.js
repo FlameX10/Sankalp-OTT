@@ -8,6 +8,20 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// Create instance for long-running uploads (5 minute timeout)
+const uploadApi = axios.create({
+  baseURL: API_BASE,
+  timeout: 300000,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+// Attach admin JWT token to upload requests too
+uploadApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem('admin_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
 // Attach admin JWT token to every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('admin_token');
@@ -66,7 +80,8 @@ export const mediaApi = {
     formData.append('episode_id', episodeId);
     formData.append('video', file);
 
-    return api.post('/media/upload/video', formData, {
+    // Use uploadApi with 5-minute timeout for video uploads
+    return uploadApi.post('/media/upload/video', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (e) => {
         if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100));

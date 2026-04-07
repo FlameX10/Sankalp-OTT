@@ -1,4 +1,4 @@
-const queue = require('./queue');
+import queue from './queue.js';
 
 const PROFILES = ['360p', '480p', '720p', '1080p'];
 
@@ -12,4 +12,4 @@ async function createTranscodeJobs(episodeId, objectName) {
   }
 }
 
-module.exports = { createTranscodeJobs };
+export { createTranscodeJobs };

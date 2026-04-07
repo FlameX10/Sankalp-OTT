@@ -1,6 +1,6 @@
-const { verifyAccessToken } = require('../utils/jwt');
-const { prisma } = require('../prisma/client');
-const config = require('../config');
+import { verifyAccessToken } from '../utils/jwt.js';
+import { prisma } from '../prisma/client.js';
+import config from '../config/index.js';
 
 // In development mode, if no token is provided, inject the seeded admin user
 // In production, this falls through to the real requireAdmin check
@@ -36,4 +36,4 @@ function devAdmin(section = null) {
   };
 }
 
-module.exports = { devAdmin };
+export { devAdmin };

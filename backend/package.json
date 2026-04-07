@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "OTT Platform Backend - Express.js + Prisma",
   "main": "server.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "dev": "node --watch server.js",
     "worker": "node workers/transcode.worker.js",

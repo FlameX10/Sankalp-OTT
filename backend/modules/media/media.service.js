@@ -1,10 +1,10 @@
-const fs = require('fs');
-const { prisma } = require('../../prisma/client');
-const { createTranscodeJobs } = require('../../producer');
-const { getPresignedPutUrl, getPresignedGetUrl, getPublicUrl } = require('../../utils/presigned-url');
-const { AppError } = require('../../middleware/error.middleware');
-const minioClient = require('../../config/minio');
-const config = require('../../config');
+import fs from 'fs';
+import { prisma } from '../../prisma/client.js';
+import { createTranscodeJobs } from '../../producer.js';
+import { getPresignedPutUrl, getPresignedGetUrl, getPublicUrl } from '../../utils/presigned-url.js';
+import { AppError } from '../../middleware/error.middleware.js';
+import minioClient from '../../config/minio.js';
+import config from '../../config/index.js';
 
 // Get presigned PUT URL for uploading video to MinIO
 async function getVideoUploadUrl(showId, episodeId) {
@@ -27,21 +27,36 @@ async function uploadVideoFile(showId, episodeId, file) {
   const metaData = {
     'Content-Type': file.mimetype || 'video/mp4'
   };
-  await minioClient.fPutObject(config.minio.bucket, objectName, file.path, metaData);
 
-  await prisma.episode.update({
-    where: { id: episodeId },
-    data: {
-      status: 'processing',
-      total_profiles: 4,
-      completed_profiles: 0,
-    },
-  });
+  try {
+    // Upload to MinIO with extended timeout
+    await minioClient.fPutObject(config.minio.bucket, objectName, file.path, metaData);
 
-  await createTranscodeJobs(episodeId, objectName);
-  fs.unlink(file.path, () => {});
+    await prisma.episode.update({
+      where: { id: episodeId },
+      data: {
+        status: 'processing',
+        total_profiles: 4,
+        completed_profiles: 0,
+      },
+    });
 
-  return { episode_id: episodeId, status: 'processing', profiles_queued: 4 };
+    await createTranscodeJobs(episodeId, objectName);
+    
+    // Clean up temp file
+    fs.unlink(file.path, (err) => {
+      if (err) console.error('Failed to delete temp file:', err);
+    });
+
+    console.log(`Video uploaded to MinIO: ${objectName}, size: ${file.size} bytes`);
+    return { episode_id: episodeId, status: 'processing', profiles_queued: 4 };
+  } catch (err) {
+    // Clean up temp file on error
+    fs.unlink(file.path, (deleteErr) => {
+      if (deleteErr) console.error('Failed to delete temp file after error:', deleteErr);
+    });
+    throw new AppError(`Video upload failed: ${err.message}`, 500);
+  }
 }
 
 // Get presigned PUT URL for uploading thumbnail/banner
@@ -146,7 +161,7 @@ async function getTranscodeStatus(episodeId) {
   };
 }
 
-module.exports = {
+export {
   getVideoUploadUrl,
   uploadVideoFile,
   getImageUploadUrl,

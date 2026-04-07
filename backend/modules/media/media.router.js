@@ -1,12 +1,24 @@
-const express = require('express');
-const os = require('os');
-const multer = require('multer');
-const router = express.Router();
-const ctrl = require('./media.controller');
-const { devAdmin } = require('../../middleware/dev-admin.middleware');
-const { allowGuest } = require('../../middleware/auth.middleware');
+import express from 'express';
+import os from 'os';
+import multer from 'multer';
+import * as ctrl from './media.controller.js';
+import { devAdmin } from '../../middleware/dev-admin.middleware.js';
+import { allowGuest } from '../../middleware/auth.middleware.js';
 
-const upload = multer({ dest: os.tmpdir() });
+const router = express.Router();
+
+// Configure multer for large video file uploads (up to 5GB)
+const upload = multer({
+  dest: os.tmpdir(),
+  limits: {
+    fileSize: 5 * 1024 * 1024 * 1024, // 5GB
+    files: 1,
+  },
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, os.tmpdir()),
+    filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname),
+  }),
+});
 
 // Admin uploads
 router.post('/upload/video', devAdmin('Dramas'), upload.single('video'), ctrl.uploadVideo);
@@ -25,4 +37,4 @@ router.get('/hls/:episodeId/*', ctrl.hlsProxy);
 // Playback URL
 router.get('/play/:episodeId', allowGuest, ctrl.getPlayUrl);
 
-module.exports = router;
+export default router;

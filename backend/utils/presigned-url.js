@@ -1,5 +1,5 @@
-const minioClient = require('../config/minio');
-const config = require('../config');
+import minioClient from '../config/minio.js';
+import config from '../config/index.js';
 
 // Generate a presigned PUT URL (for uploading files from browser/admin)
 async function getPresignedPutUrl(objectName, expirySeconds = 900) {
@@ -17,4 +17,4 @@ function getPublicUrl(objectName) {
   return `${protocol}://${config.minio.endPoint}:${config.minio.port}/${config.minio.bucket}/${objectName}`;
 }
 
-module.exports = { getPresignedPutUrl, getPresignedGetUrl, getPublicUrl };
+export { getPresignedPutUrl, getPresignedGetUrl, getPublicUrl };

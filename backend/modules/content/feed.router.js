@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import { prisma } from '../../prisma/client.js';
+import { getPresignedGetUrl } from '../../utils/presigned-url.js';
+
 const router = express.Router();
-const { prisma } = require('../../prisma/client');
-const { getPresignedGetUrl } = require('../../utils/presigned-url');
 
 // GET /api/feed/for-you — Episode 1 of featured/random shows
 router.get('/for-you', async (req, res, next) => {
@@ -106,4 +107,4 @@ router.get('/show/:showId', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-module.exports = router;
+export default router;

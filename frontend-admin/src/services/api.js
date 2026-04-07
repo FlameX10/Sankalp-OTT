@@ -29,6 +29,18 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// ── Auth ──
+export const authApi = {
+  login: (email, password) => 
+    api.post('/v1/auth/login', { email, password }, {
+      headers: { 'x-client-type': 'web' }
+    }),
+  logout: () => {
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+  }
+};
+
 // ── Categories ──
 export const categoriesApi = {
   getAll: () => api.get('/content/categories'),

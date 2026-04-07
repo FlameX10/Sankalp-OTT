@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './index.css'
 
 import Layout from './components/Layout.jsx'
+import Login from './pages/Login.jsx'
 
 import Dashboard     from './pages/Dashboard.jsx'
 import Users         from './pages/Users.jsx'
@@ -31,11 +32,35 @@ const ROUTES = {
 }
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [active, setActive] = useState('dashboard')
   const Page = ROUTES[active] || Dashboard
 
+  // Check if user is already logged in
+  useEffect(() => {
+    const token = localStorage.getItem('admin_token')
+    if (token) {
+      setIsAuthenticated(true)
+    }
+  }, [])
+
+  const handleLoginSuccess = () => {
+    setIsAuthenticated(true)
+    setActive('dashboard')
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('admin_token')
+    localStorage.removeItem('admin_user')
+    setIsAuthenticated(false)
+  }
+
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={handleLoginSuccess} />
+  }
+
   return (
-    <Layout active={active} onNavigate={setActive}>
+    <Layout active={active} onNavigate={setActive} onLogout={handleLogout}>
       <Page />
     </Layout>
   )

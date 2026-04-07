@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, registerAdminController } from './auth.controller.js';
+import { register, login, registerAdminController ,refreshToken} from './auth.controller.js';
 
 const router = express.Router();
 
@@ -23,5 +23,7 @@ router.post('/login', login);
  * Body: { name, email, password, adminSecret }
  */
 router.post('/register-admin', registerAdminController);
+
+router.get("/refresh-token", refreshToken);
 
 export default router;

@@ -30,8 +30,8 @@ async function startServer() {
     // DB init (MAIN)
     await initializeDatabase();
 
-    // Start server
-    server = app.listen(PORT, () => {
+    // 3. Start HTTP server
+    server = app.listen(PORT, "0.0.0.0", () => {
       logger.info(`✓ Server is running on http://localhost:${PORT}`);
       logger.info(`✓ Environment: ${process.env.NODE_ENV}`);
       logger.info(`✓ Health check available at http://localhost:${PORT}/health`);

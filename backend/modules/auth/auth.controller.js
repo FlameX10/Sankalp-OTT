@@ -1,9 +1,21 @@
-import { registerUser, loginUser, registerAdmin } from './auth.service.js';
+import bcrypt from 'bcrypt';
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  hashRefreshToken,
+  loginUser,
+  registerAdmin,
+  registerUser,
+  verifyRefreshToken,
+} from './auth.service.js';
 import { validateRegister, validateLogin, validateClientType } from './auth.validation.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { ApiError } from '../../utils/ApiError.js';
 import logger from '../../config/logger.js';
+import { getPrismaClient } from '../../config/db.js';
+
+const prisma = getPrismaClient();
 
 /**
  * Register user controller
@@ -135,4 +147,101 @@ export const registerAdminController = asyncHandler(async (req, res, next) => {
   return res.status(201).json(
     new ApiResponse(201, result.user, 'Admin registered successfully. Please login to continue')
   );
+});
+
+/**
+ * Refresh token controller
+ *
+ * Header: x-client-type: mobile | web
+ *
+ * - mobile: expects refresh token in Authorization header: Bearer <refreshToken>
+ * - web: expects refresh token in cookie: refreshToken=<token>
+ */
+export const refreshToken = asyncHandler(async (req, res) => {
+  const clientTypeHeader = req.headers['x-client-type'];
+
+  // Validate client type
+  const clientTypeValidation = validateClientType(clientTypeHeader);
+  if (!clientTypeValidation.isValid) {
+    throw new ApiError(400, clientTypeValidation.error);
+  }
+
+  const clientType = clientTypeValidation.value; // 'web' | 'mobile'
+
+  let refreshTokenValue = null;
+
+  if (clientType === 'web') {
+    refreshTokenValue = req.cookies?.refreshToken;
+  } else {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      refreshTokenValue = authHeader.slice(7);
+    }
+  }
+
+  if (!refreshTokenValue || String(refreshTokenValue).trim().length === 0) {
+    throw new ApiError(401, 'Refresh token missing');
+  }
+
+  // 1) Verify refresh token signature + expiry
+  const decoded = verifyRefreshToken(refreshTokenValue);
+  if (!decoded?.id) {
+    throw new ApiError(401, 'Invalid refresh token payload');
+  }
+
+  // 2) Verify token matches the one stored (hashed) in DB
+  const user = await prisma.user.findUnique({
+    where: { id: decoded.id },
+  });
+
+  if (!user) {
+    throw new ApiError(401, 'User not found');
+  }
+
+  if (!user.refreshToken) {
+    throw new ApiError(401, 'No refresh token stored for user');
+  }
+
+  const matches = await bcrypt.compare(refreshTokenValue, user.refreshToken);
+  if (!matches) {
+    throw new ApiError(401, 'Refresh token is invalid');
+  }
+
+  // 3) Rotate tokens
+  const newAccessToken = generateAccessToken(user);
+  const newRefreshToken = generateRefreshToken(user);
+  const newRefreshTokenHash = await hashRefreshToken(newRefreshToken);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { refreshToken: newRefreshTokenHash },
+  });
+
+  logger.info('Refresh token rotated successfully', {
+    userId: user.id,
+    clientType,
+  });
+
+  // For web clients: set refresh token as secure http-only cookie
+  if (clientType === 'web') {
+    res.cookie('refreshToken', newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+  }
+
+  const responseData = {
+    accessToken: newAccessToken,
+  };
+
+  // For mobile clients: include refresh token in response body
+  if (clientType !== 'web') {
+    responseData.refreshToken = newRefreshToken;
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, responseData, 'Token refreshed successfully'));
 });

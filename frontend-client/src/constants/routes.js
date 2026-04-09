@@ -6,5 +6,6 @@ export const ROUTES = {
   FOR_YOU: 'ForYou',
   MEMBERSHIP: 'MembershipScreen',
   MY_LIST: 'MyList',
+  MY_WALLET: 'MyWallet',
   PROFILE: 'Profile',
 };

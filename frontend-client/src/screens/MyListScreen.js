@@ -1,19 +1,82 @@
 import React from 'react';
-import { FlatList, StyleSheet, Text, View, Pressable, Dimensions } from 'react-native';
+import { FlatList, StyleSheet, Text, View, Pressable, Dimensions, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
 const MOCK_SAVED = [
-  { id: '1', title: 'The Silent Shadows', duration: '24:15', category: 'Action' },
-  { id: '2', title: 'Eternal Summer', duration: '18:40', category: 'Romance' },
-  { id: '3', title: 'Midnight Mystery', duration: '12:05', category: 'Thriller' },
+  {
+    id: '1',
+    title: 'The Dark Knight',
+    duration: '24:15',
+    category: 'Action',
+    image: 'https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg',
+  },
+  {
+    id: '2',
+    title: 'Inception',
+    duration: '18:40',
+    category: 'Sci-Fi',
+    image: 'https://image.tmdb.org/t/p/w500/8h58cHFA1FZ2sVbZ1yGQyF3I8h.jpg',
+  },
+  {
+    id: '3',
+    title: 'Interstellar',
+    duration: '12:05',
+    category: 'Drama',
+    image: 'https://image.tmdb.org/t/p/w500/rAiYTfKGqDCRIIqo664sY9XZIvQ.jpg',
+  },
+  {
+    id: '4',
+    title: 'Avengers: Endgame',
+    duration: '30:20',
+    category: 'Action',
+    image: 'https://image.tmdb.org/t/p/w500/or06FN3Dka5tukK1e9sl16pB3iy.jpg',
+  },
+  {
+    id: '5',
+    title: 'Joker',
+    duration: '16:45',
+    category: 'Thriller',
+    image: 'https://image.tmdb.org/t/p/w500/udDclJoHjfjb8Ekgsd4FDteOkCU.jpg',
+  },
+  {
+    id: '6',
+    title: 'Titanic',
+    duration: '22:10',
+    category: 'Romance',
+    image: 'https://image.tmdb.org/t/p/w500/9xjZS2rlVxm8SFx8kPC3aIGCOYQ.jpg',
+  },
+  {
+    id: '7',
+    title: 'Spider-Man: No Way Home',
+    duration: '19:55',
+    category: 'Action',
+    image: 'https://image.tmdb.org/t/p/w500/1g0dhYtq4irTY1GPXvft6k4YLjm.jpg',
+  },
+  {
+    id: '8',
+    title: 'Doctor Strange',
+    duration: '14:30',
+    category: 'Fantasy',
+    image: 'https://image.tmdb.org/t/p/w500/uGBVj3bEbCoZbDjjl9wTxcygko1.jpg',
+  },
+  {
+    id: '9',
+    title: 'The Matrix',
+    duration: '21:00',
+    category: 'Sci-Fi',
+    image: 'https://image.tmdb.org/t/p/w500/aOIuZAjPaRIE6CMzbazvcHuHXDc.jpg',
+  },
 ];
 
 export default function MyListScreen() {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
         <Text style={styles.title}>My List</Text>
         <View style={styles.countBadge}>
@@ -33,11 +96,15 @@ export default function MyListScreen() {
             styles.card,
             pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
           ]}>
-            {/* Thumbnail Placeholder */}
+            
+            {/* 🔥 Thumbnail with Image */}
             <View style={styles.thumbnail}>
+              <Image source={{ uri: item.image }} style={styles.image} />
+
               <View style={styles.playOverlay}>
                 <Ionicons name="play" size={20} color={theme.white} />
               </View>
+
               <View style={styles.durationBadge}>
                 <Text style={styles.durationText}>{item.duration}</Text>
               </View>
@@ -73,22 +140,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.deepBlack,
     paddingHorizontal: 16,
-    paddingTop: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
   },
   title: {
     color: theme.white,
     fontSize: 28,
     fontWeight: '800',
-    letterSpacing: -0.5,
   },
   countBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -96,13 +160,11 @@ const styles = StyleSheet.create({
   countText: {
     color: theme.gray,
     fontSize: 12,
-    fontWeight: '600',
   },
   subtitle: {
     color: theme.gray,
     fontSize: 14,
     marginBottom: 24,
-    opacity: 0.8,
   },
   list: {
     gap: 16,
@@ -114,27 +176,26 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     height: 100,
-    // Add subtle border for depth
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
   },
   thumbnail: {
     width: 140,
     height: '100%',
-    backgroundColor: '#2A2A2A', // Darker skeleton color
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
   },
   playOverlay: {
+    position: 'absolute',
+    top: '35%',
+    left: '35%',
     width: 36,
     height: 36,
     borderRadius: 18,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
   },
   durationBadge: {
     position: 'absolute',
@@ -142,7 +203,6 @@ const styles = StyleSheet.create({
     right: 6,
     backgroundColor: 'rgba(0,0,0,0.75)',
     paddingHorizontal: 6,
-    paddingVertical: 2,
     borderRadius: 4,
   },
   durationText: {
@@ -159,7 +219,6 @@ const styles = StyleSheet.create({
     color: theme.crimson,
     fontSize: 10,
     fontWeight: '800',
-    marginBottom: 2,
   },
   cardTitle: {
     color: theme.white,
@@ -171,7 +230,4 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 15,
   },
-  actionBtn: {
-    opacity: 0.8,
-  }
 });

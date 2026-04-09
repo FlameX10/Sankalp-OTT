@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import ProfileScreen from '../screens/ProfileScreen';
 import MembershipScreen from '../screens/MembershipScreen';
+import MyWallet from '../screens/MyWallet';
 import { ROUTES } from '../constants/routes';
 import { theme } from '../constants/theme';
 
@@ -21,6 +22,17 @@ export default function ProfileStackNavigator() {
         component={MembershipScreen}
         options={{
           title: 'Membership',
+          headerShown: true,
+          headerStyle: { backgroundColor: theme.deepBlack },
+          headerTintColor: theme.white,
+          headerShadowVisible: false,
+        }}
+      />
+      <Stack.Screen
+        name={ROUTES.MY_WALLET}
+        component={MyWallet}
+        options={{
+          title: 'My Wallet',
           headerShown: true,
           headerStyle: { backgroundColor: theme.deepBlack },
           headerTintColor: theme.white,

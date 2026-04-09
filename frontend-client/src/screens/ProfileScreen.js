@@ -8,7 +8,10 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
+
 
 import { theme } from '../constants/theme';
 import { ROUTES } from '../constants/routes';
@@ -62,6 +65,8 @@ function MenuItem({ icon, label, right, badge, onPress }) {
 }
 
 export default function ProfileScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+  const name = useSelector((state) => state.auth.name);
   const dispatch = useDispatch();
   const { logout: logoutState } = useSelector((state) => state.auth);
 
@@ -79,6 +84,8 @@ export default function ProfileScreen({ navigation }) {
     navigation.navigate(ROUTES.MEMBERSHIP);
   }
 
+  function goToMyWallet() {
+    navigation.navigate(ROUTES.MY_WALLET);
   function handleLogout() {
     // Dispatch logout action (clears tokens, calls backend)
     dispatch(logoutUser());
@@ -88,7 +95,10 @@ export default function ProfileScreen({ navigation }) {
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={styles.container}
+      contentContainerStyle={[
+        styles.container,
+        { paddingTop: insets.top + 12 },
+      ]}
     >
       {/* Header */}
       <View style={styles.header}>
@@ -98,22 +108,15 @@ export default function ProfileScreen({ navigation }) {
           </View>
           <View>
             <View style={styles.loginRow}>
-              <Text style={styles.loginText}>Log in</Text>
+              <Text style={styles.loginText}>{name || 'Guest'}</Text>
               <Ionicons
                 name="chevron-forward"
                 size={16}
                 color={theme.white}
               />
             </View>
-            <Text style={styles.idText}>
-              ID 447126581{' '}
-              <Text style={styles.separator}>|</Text> Following 0
-            </Text>
           </View>
         </View>
-        <Pressable>
-          <Ionicons name="settings-outline" size={24} color={theme.white} />
-        </Pressable>
       </View>
 
       {/* Membership Banner */}
@@ -149,7 +152,11 @@ export default function ProfileScreen({ navigation }) {
       <View style={styles.menuCard}>
         <MenuItem icon="star-outline" label="Membership" onPress={goToMembership} />
         {MENU_ITEMS.map((item) => (
-          <MenuItem key={item.label} {...item} />
+          <MenuItem
+            key={item.label}
+            {...item}
+            onPress={item.label === 'My Wallet' ? goToMyWallet : item.onPress}
+          />
         ))}
       </View>
 
@@ -190,7 +197,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingHorizontal: 20,
-    paddingTop: 16,
     paddingBottom: 20,
   },
   headerLeft: {

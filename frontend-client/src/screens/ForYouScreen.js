@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Video } from 'expo-av';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -31,15 +32,21 @@ const MOCK_REELS = [
     episode: 'EP.1 / EP.61',
     saves: '363K',
     bgColor: '#1A0020',
+    media: {
+      uri: 'https://www.w3schools.com/html/mov_bbb.mp4',
+    },
   },
   {
     id: '2',
-    title: 'The Mafia Boss\'s Baby',
+    title: "The Mafia Boss's Baby",
     tags: ['New', 'Mafia', 'Action'],
     description: 'She thought it was a one-night stand, but the King of the underworld never lets go...',
     episode: 'EP.4 / EP.54',
     saves: '1.2M',
     bgColor: '#050505',
+    media: {
+      uri: 'https://www.w3schools.com/html/movie.mp4',
+    },
   },
 ];
 
@@ -55,18 +62,56 @@ function SideAction({ icon, label, color, onPress }) {
 function ReelItem({ item }) {
   const insets = useSafeAreaInsets();
   const [saved, setSaved] = useState(false);
+  const videoRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(true);
+
+  const togglePlay = useCallback(async () => {
+    try {
+      const video = videoRef.current;
+      if (!video) return;
+
+      const status = await video.getStatusAsync();
+      if (!status.isLoaded) return;
+
+      if (status.isPlaying) {
+        await video.pauseAsync();
+        setIsPlaying(false);
+      } else {
+        await video.playAsync();
+        setIsPlaying(true);
+      }
+    } catch (e) {
+      console.log('Video toggle error', e);
+    }
+  }, []);
 
   return (
     <View style={styles.reelContainer}>
-      {/* 1. FULL SCREEN BACKGROUND (VIDEO AREA) */}
-      <View style={[styles.background, { backgroundColor: item.bgColor }]}>
-        <Ionicons name="play" size={80} color="rgba(255,255,255,0.1)" />
-      </View>
+      
+      {/* ✅ VIDEO BACKGROUND */}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={styles.background}
+        onPress={togglePlay}
+      >
+        <Video
+          ref={videoRef}
+          style={StyleSheet.absoluteFill}
+          source={item.media}
+          resizeMode="cover"
+          isLooping
+          shouldPlay   // ✅ auto play
+          isMuted={true}
+        />
 
-      {/* 2. UI LAYER */}
+        {!isPlaying && (
+          <Ionicons name="play" size={80} color="rgba(255,255,255,0.7)" />
+        )}
+      </TouchableOpacity>
+
+      {/* UI (UNCHANGED) */}
       <View style={[styles.uiOverlay, { paddingBottom: insets.bottom + 78 }]}>
 
-        {/* RIGHT SIDE BUTTONS: Positioned above the text level */}
         <View style={styles.sideActionsColumn}>
           <SideAction
             icon={saved ? 'bookmark' : 'bookmark-outline'}
@@ -78,7 +123,6 @@ function ReelItem({ item }) {
           <SideAction icon="share-social" label="Share" />
         </View>
 
-        {/* BOTTOM TEXT CONTENT: Starts after the buttons vertically or sits to the left */}
         <View style={styles.textContent}>
           <View style={styles.titleRow}>
             <Text style={styles.reelTitle} numberOfLines={1}>{item.title}</Text>
@@ -97,7 +141,6 @@ function ReelItem({ item }) {
             {item.description} <Text style={{ fontWeight: 'bold', color: '#fff' }}>more</Text>
           </Text>
 
-          {/* Episode Progress Strip */}
           <TouchableOpacity style={styles.episodeStrip}>
             <Ionicons name="play-circle" size={20} color={theme.crimson} />
             <Text style={styles.episodeText}>{item.episode}</Text>
@@ -107,7 +150,6 @@ function ReelItem({ item }) {
         </View>
       </View>
 
-      {/* Top Search Overlay */}
       <TouchableOpacity style={[styles.topSearch, { top: insets.top + 10 }]}>
         <Ionicons name="search" size={26} color="#fff" />
       </TouchableOpacity>
@@ -124,37 +166,19 @@ export default function ForYouScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <ReelItem item={item} />}
 
-        // REELS SCROLLING LOGIC
-        pagingEnabled={true}
+        pagingEnabled
         snapToInterval={SCREEN_HEIGHT}
         snapToAlignment="start"
         decelerationRate="fast"
         showsVerticalScrollIndicator={false}
-
-        // Performance optimization for full-screen lists
-        removeClippedSubviews={true}
-        initialNumToRender={1}
-        maxToRenderPerBatch={2}
-        windowSize={3}
-        getItemLayout={(_, index) => ({
-          length: SCREEN_HEIGHT,
-          offset: SCREEN_HEIGHT * index,
-          index,
-        })}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  reelContainer: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
-  },
+  screen: { flex: 1, backgroundColor: '#000' },
+  reelContainer: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
   background: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
@@ -165,69 +189,23 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
   },
-
-  // Side buttons positioned on the right
   sideActionsColumn: {
     alignSelf: 'flex-end',
     alignItems: 'center',
-    marginBottom: 20, // Gap between the last button (share) and the start of the title
+    marginBottom: 20,
     gap: 25,
     paddingRight: 4,
   },
-  sideAction: {
-    alignItems: 'center',
-  },
-  sideLabel: {
-    color: '#fff',
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: '600',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: -1, height: 1 },
-    textShadowRadius: 10,
-  },
-
-  // Text content anchored to bottom left
-  textContent: {
-    width: '100%',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  reelTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '800',
-    marginRight: 6,
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  tagPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  tagHot: {
-    backgroundColor: theme.crimson,
-  },
-  tagText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  descText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 18,
-    paddingRight: 40, // Don't let text go under the buttons area
-  },
+  sideAction: { alignItems: 'center' },
+  sideLabel: { color: '#fff', fontSize: 12, marginTop: 4 },
+  textContent: { width: '100%' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  reelTitle: { color: '#fff', fontSize: 20, fontWeight: '800', marginRight: 6 },
+  tagsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  tagPill: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.2)' },
+  tagHot: { backgroundColor: theme.crimson },
+  tagText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+  descText: { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginBottom: 18 },
   episodeStrip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -235,18 +213,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderRadius: 10,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
-  episodeText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-    marginLeft: 8,
-  },
-  topSearch: {
-    position: 'absolute',
-    right: 20,
-    padding: 10,
-  },
+  episodeText: { color: '#fff', fontSize: 14, fontWeight: '700', marginLeft: 8 },
+  topSearch: { position: 'absolute', right: 20, padding: 10 },
 });

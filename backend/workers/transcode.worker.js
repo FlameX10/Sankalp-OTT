@@ -8,6 +8,7 @@ import minioClient from '../config/minio.js';
 import config from '../config/index.js';
 import { prisma } from '../prisma/client.js';
 import { createMasterPlaylist } from '../master.js';
+import { getQualityFolderPath } from '../utils/minio-paths.js';
 
 const BUCKET = config.minio.bucket;
 const TEMP_DIR = path.join(os.tmpdir(), 'ott-transcode');
@@ -66,6 +67,16 @@ async function processJob(job) {
   const p = PROFILES.find(x => x.name === profile);
   if (!p) throw new Error('Invalid profile');
 
+  // Fetch episode to get showId
+  const episode = await prisma.episode.findUnique({
+    where: { id: episodeId },
+    select: { id: true, show_id: true, total_profiles: true, status: true },
+  });
+
+  if (!episode) throw new Error('Episode not found');
+
+  const showId = episode.show_id;
+
   const workDir = path.join(TEMP_DIR, episodeId);
   const inputPath = path.join(workDir, 'input.mp4');
 
@@ -81,11 +92,11 @@ async function processJob(job) {
       console.log(`[Worker] ✅ Video downloaded`);
     }
 
-    const hlsDir = path.join(workDir, 'hls');
+    const hlsDir = path.join(workDir, p.name);
     if (!fs.existsSync(hlsDir)) fs.mkdirSync(hlsDir);
 
-    const playlistPath = path.join(hlsDir, `${p.name}.m3u8`);
-    const segmentPattern = path.join(hlsDir, `${p.name}_%03d.ts`);
+    const playlistPath = path.join(hlsDir, `index.m3u8`);
+    const segmentPattern = path.join(hlsDir, `seg_%03d.ts`);
 
     const args = [
       '-i', inputPath,
@@ -104,12 +115,12 @@ async function processJob(job) {
     console.log(`[Worker] ✅ FFmpeg encoding complete for ${profile}`);
 
     // Upload files
-    const files = fs.readdirSync(hlsDir).filter(f => f.startsWith(p.name));
+    const files = fs.readdirSync(hlsDir).filter(f => f.startsWith('seg_') || f.endsWith('.m3u8'));
     console.log(`[Worker] 📤 Uploading ${files.length} files for ${profile}...`);
 
     for (const file of files) {
       const localFile = path.join(hlsDir, file);
-      const minioPath = `hls/${episodeId}/${file}`;
+      const minioPath = getQualityFolderPath(showId, episodeId, p.name) + '/' + file;
       const ct = file.endsWith('.m3u8')
         ? 'application/vnd.apple.mpegurl'
         : 'video/mp2t';
@@ -119,7 +130,7 @@ async function processJob(job) {
     console.log(`[Worker] ✅ All files uploaded for ${profile}`);
 
     // Update DB
-    const episode = await prisma.episode.update({
+    const updatedEpisode = await prisma.episode.update({
       where: { id: episodeId },
       data: {
         completed_profiles: { increment: 1 },
@@ -128,10 +139,10 @@ async function processJob(job) {
 
     // Final step
     if (
-      episode.completed_profiles >= episode.total_profiles &&
-      episode.status !== 'ready'
+      updatedEpisode.completed_profiles >= updatedEpisode.total_profiles &&
+      updatedEpisode.status !== 'ready'
     ) {
-      await createMasterPlaylist(episodeId);
+      await createMasterPlaylist(showId, episodeId);
     }
 
     return { episodeId, profile };
@@ -151,7 +162,7 @@ async function processJob(job) {
 
 const worker = new Worker('transcode-queue', processJob, {
   connection: redis,
-  concurrency: 4, // Reduce to 2 for CPU-intensive FFmpeg tasks
+  concurrency: 2, // 2 parallel tasks - prevents 1080p timeout
   lockDuration: 30 * 60 * 1000, // 30 minutes - long enough for transcoding
   lockRenewTime: 5 * 60 * 1000, // Renew lock every 5 minutes
   maxStalledCount: 2, // Allow 2 stall attempts before failing

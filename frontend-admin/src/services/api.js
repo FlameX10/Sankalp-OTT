@@ -29,6 +29,33 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Auto-logout on 401 — token expired or invalid
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('admin_user');
+      // Trigger a full page reload — Redux store resets,
+      // authSlice sees no token, login screen appears
+      window.location.href = '/';
+    }
+    return Promise.reject(error);
+  }
+);
+
+// ── Auth ──
+export const authApi = {
+  login: (email, password) => 
+    api.post('/v1/auth/login', { email, password }, {
+      headers: { 'x-client-type': 'web' }
+    }),
+  logout: () => {
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+  }
+};
+
 // ── Categories ──
 export const categoriesApi = {
   getAll: () => api.get('/content/categories'),

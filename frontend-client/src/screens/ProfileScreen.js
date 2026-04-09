@@ -1,17 +1,21 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   ScrollView,
   StyleSheet,
   Text,
   View,
   Pressable,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+
 
 import { theme } from '../constants/theme';
 import { ROUTES } from '../constants/routes';
+import { logoutUser, clearLogoutError } from '../redux/slices/authSlice';
 
 const FEATURE_ICONS = [
   { icon: 'play-circle-outline', label: '8K+ series' },
@@ -63,6 +67,18 @@ function MenuItem({ icon, label, right, badge, onPress }) {
 export default function ProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const name = useSelector((state) => state.auth.name);
+  const dispatch = useDispatch();
+  const { logout: logoutState } = useSelector((state) => state.auth);
+
+  // Show error alert when logout fails
+  useEffect(() => {
+    if (logoutState.error && !logoutState.isLoading) {
+      Alert.alert('Logout Failed', logoutState.error, [
+        { text: 'Retry', onPress: () => dispatch(logoutUser()) },
+        { text: 'Dismiss', onPress: () => dispatch(clearLogoutError()) },
+      ]);
+    }
+  }, [logoutState.error, logoutState.isLoading, dispatch]);
 
   function goToMembership() {
     navigation.navigate(ROUTES.MEMBERSHIP);
@@ -70,6 +86,10 @@ export default function ProfileScreen({ navigation }) {
 
   function goToMyWallet() {
     navigation.navigate(ROUTES.MY_WALLET);
+  function handleLogout() {
+    // Dispatch logout action (clears tokens, calls backend)
+    dispatch(logoutUser());
+    // AuthWrapper will automatically handle navigation to login screen
   }
 
   return (
@@ -148,8 +168,14 @@ export default function ProfileScreen({ navigation }) {
         <MenuItem
           icon="log-out-outline"
           label="Log out"
-          onPress={() => navigation.replace(ROUTES.SIGNUP)}
+          onPress={handleLogout}
         />
+        {/* Show logout error if exists */}
+        {logoutState.error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Error: {logoutState.error}</Text>
+          </View>
+        )}
       </View>
 
       <View style={{ height: 30 }} />
@@ -316,5 +342,18 @@ const styles = StyleSheet.create({
     color: theme.white,
     fontSize: 11,
     fontWeight: '700',
+  },
+  errorContainer: {
+    backgroundColor: '#ffebee',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: theme.crimson,
+  },
+  errorText: {
+    color: theme.crimson,
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

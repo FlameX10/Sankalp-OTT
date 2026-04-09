@@ -9,11 +9,11 @@ const prisma = getPrismaClient();
 // JWT configuration
 const JWT_CONFIG = {
   access: {
-    secret: process.env.JWT_ACCESS_SECRET || 'your-access-secret-key',
+    secret: process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production-abc123xyz',
     expiresIn: '15m'
   },
   refresh: {
-    secret: process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
+    secret: process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret-change-in-production-789def',
     expiresIn: '7d'
   }
 };
@@ -277,5 +277,37 @@ export const registerAdmin = async (adminData) => {
       throw error;
     }
     throw new ApiError(500, 'Failed to register admin', [error.message]);
+  }
+};
+
+/**
+ * Logout user - null refresh token in database
+ */
+export const logoutUserService = async (userId) => {
+  try {
+    // Find user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, role: true }
+    });
+
+    if (!user) {
+      throw new ApiError(401, 'User not found');
+    }
+
+    // Null refresh token in DB
+    await prisma.user.update({
+      where: { id: userId },
+      data: { refreshToken: null }
+    });
+
+    logger.info('User logged out successfully', { userId, email: user.email });
+    return user;
+  } catch (error) {
+    logger.error('Logout service error', { error: error.message });
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, 'Failed to logout', [error.message]);
   }
 };

@@ -1,7 +1,11 @@
-import { useState } from 'react'
+import { useSelector } from 'react-redux'
 import './index.css'
 
-import Layout from './components/Layout.jsx'
+import { selectIsAuthenticated } from './store/authSlice'
+import { selectActivePage }      from './store/navigationSlice'
+
+import Layout        from './components/Layout.jsx'
+import Login         from './pages/Login.jsx'
 
 import Dashboard     from './pages/Dashboard.jsx'
 import Users         from './pages/Users.jsx'
@@ -31,11 +35,16 @@ const ROUTES = {
 }
 
 export default function App() {
-  const [active, setActive] = useState('dashboard')
-  const Page = ROUTES[active] || Dashboard
+  const isAuthenticated = useSelector(selectIsAuthenticated)
+  const activePage      = useSelector(selectActivePage)
+  const Page            = ROUTES[activePage] || Dashboard
+
+  if (!isAuthenticated) {
+    return <Login />
+  }
 
   return (
-    <Layout active={active} onNavigate={setActive}>
+    <Layout>
       <Page />
     </Layout>
   )

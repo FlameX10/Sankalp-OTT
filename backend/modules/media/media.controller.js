@@ -25,6 +25,16 @@ async function getImageUploadUrl(req, res, next) {
   } catch (e) { next(e); }
 }
 
+async function uploadImage(req, res, next) {
+  try {
+    if (!req.file) throw new Error('No image file provided');
+    const { type, entity_id } = req.body;
+    if (!type || !entity_id) throw new Error('type and entity_id are required');
+    const result = await mediaService.uploadImageFile(type, entity_id, req.file);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
 async function confirmVideoUpload(req, res, next) {
   try {
     const result = await mediaService.confirmVideoUpload(req.body.episode_id);
@@ -99,6 +109,6 @@ async function hlsProxy(req, res, next) {
 }
 
 export {
-  getVideoUploadUrl, uploadVideo, getImageUploadUrl, confirmVideoUpload,
+  getVideoUploadUrl, uploadVideo, getImageUploadUrl, uploadImage, confirmVideoUpload,
   confirmImageUpload, getPlayUrl, getTranscodeStatus, hlsProxy,
 };

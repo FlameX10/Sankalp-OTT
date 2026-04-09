@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import logger from './config/logger.js';
 import { checkDatabaseHealth } from './config/db.js';
 import { errorHandler } from './middleware/error.middleware.js';
+import { ApiResponse } from './utils/ApiResponse.js';
 import authRouter from './modules/auth/auth.routes.js';
 
 // added from admin_ui_v2 (non-conflicting)
@@ -31,7 +32,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
 app.use(cookieParser());
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? process.env.FRONTEND_URL 
+    : 'http://localhost:5173',
+  credentials: true,
+}));
 
 // added (safe, no conflict)
 app.use(helmet());
@@ -119,14 +125,9 @@ app.use('/api/media', mediaRouter);
 
 // MAIN format
 app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: {
-      message: 'Route not found',
-      path: req.path,
-      method: req.method,
-    },
-  });
+  res.status(404).json(
+    new ApiResponse(404, null, 'Route not found')
+  );
 });
 
 // ============= ERROR HANDLER =============

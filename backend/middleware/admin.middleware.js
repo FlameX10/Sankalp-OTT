@@ -1,4 +1,4 @@
-import { verifyAccessToken } from '../utils/jwt.js';
+import { verifyAccessToken } from '../modules/auth/auth.service.js';
 import { prisma } from '../prisma/client.js';
 
 // Requires admin or sub_admin role. For sub_admins, checks section access.

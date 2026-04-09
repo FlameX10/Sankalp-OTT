@@ -47,7 +47,7 @@ const requestQueue = new RequestQueue();
  */
 
 export const api = axios.create({
-  baseURL: 'http://172.31.56.61:3000/api/v1',
+  baseURL: 'http://172.31.56.30:5000/api/v1',
   headers: {
     'Content-Type': 'application/json',
     'x-client-type': authService.getClientType(),
@@ -100,7 +100,7 @@ api.interceptors.request.use(
 
 // Create a separate axios instance for refresh calls (bypass interceptors)
 const refreshApi = axios.create({
-  baseURL: 'http://172.31.56.61:3000/api/v1',
+  baseURL: 'http://172.31.56.30:5000/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },

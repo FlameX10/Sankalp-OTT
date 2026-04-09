@@ -86,6 +86,8 @@ export default function ProfileScreen({ navigation }) {
 
   function goToMyWallet() {
     navigation.navigate(ROUTES.MY_WALLET);
+  }
+
   function handleLogout() {
     // Dispatch logout action (clears tokens, calls backend)
     dispatch(logoutUser());

@@ -75,6 +75,48 @@ async function getImageUploadUrl(type, entityId) {
   return { upload_url: uploadUrl, public_url: publicUrl, object_name: objectName };
 }
 
+// Upload image file directly to MinIO (from backend, avoiding CORS issues)
+async function uploadImageFile(type, entityId, file) {
+  let objectName;
+
+  if (type === 'thumbnail') objectName = `thumbnails/${entityId}/thumb.jpg`;
+  else if (type === 'banner') objectName = `banners/${entityId}/banner.jpg`;
+  else if (type === 'collection') objectName = `collections/${entityId}/cover.jpg`;
+  else throw new AppError('Invalid upload type', 400);
+
+  const metaData = {
+    'Content-Type': file.mimetype || 'image/jpeg'
+  };
+
+  try {
+    // Upload to MinIO
+    await minioClient.fPutObject(config.minio.bucket, objectName, file.path, metaData);
+    
+    const publicUrl = getPublicUrl(objectName);
+
+    // Update database with public URL
+    if (type === 'thumbnail' || type === 'banner') {
+      const updateData = {};
+      updateData[type + '_url'] = publicUrl;
+      await prisma.show.update({ where: { id: entityId }, data: updateData });
+    }
+
+    // Clean up temp file
+    fs.unlink(file.path, (err) => {
+      if (err) console.error('Failed to delete temp file:', err);
+    });
+
+    console.log(`[Media] ${type} uploaded to MinIO: ${objectName}`);
+    return { object_name: objectName, public_url: publicUrl, type };
+  } catch (err) {
+    // Clean up temp file on error
+    fs.unlink(file.path, (deleteErr) => {
+      if (deleteErr) console.error('Failed to delete temp file after error:', deleteErr);
+    });
+    throw new AppError(`Image upload failed: ${err.message}`, 500);
+  }
+}
+
 // Called after video upload completes — enqueues transcode jobs
 async function confirmVideoUpload(episodeId) {
   console.log('[Media] confirmVideoUpload called for episode:', episodeId);
@@ -165,6 +207,7 @@ export {
   getVideoUploadUrl,
   uploadVideoFile,
   getImageUploadUrl,
+  uploadImageFile,
   confirmVideoUpload,
   confirmImageUpload,
   getPlayUrl,

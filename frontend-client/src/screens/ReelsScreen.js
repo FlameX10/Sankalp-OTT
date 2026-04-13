@@ -10,7 +10,7 @@ import {
   StatusBar,
   TextInput,
 } from 'react-native';
-import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
+import { Ionicons,FontAwesome6 } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 
@@ -107,7 +107,7 @@ export default function PopularScreen() {
 
         <View style={styles.headerIcons}>
           {/* Membership Crown Button */}
-          <TouchableOpacity 
+          <TouchableOpacity  
             onPress={() => navigation.navigate(ROUTES.PROFILE, { screen: ROUTES.MEMBERSHIP })}
           >
             <FontAwesome6 name="crown" size={24} color="yellow" />
@@ -176,6 +176,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 15,
   },
+
   tabContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,

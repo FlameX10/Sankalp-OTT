@@ -68,7 +68,7 @@ export default function SignUpScreen({ navigation }) {
   return (
     <ScrollView
       contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps={true}
+      keyboardShouldPersistTaps="always"
     >
       {/* Logo */}
       <View style={styles.logoRow}>

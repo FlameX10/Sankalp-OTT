@@ -49,6 +49,9 @@ export const loginUser = createAsyncThunk(
       // Only refreshToken is saved to SecureStore (sensitive)
       // accessToken will be stored in Redux by reducer
       await authService.saveTokens(accessToken, refreshToken);
+      
+      // Save user data to SecureStore for later restoration
+      await authService.saveUserData(user);
 
       // Return ONLY accessToken and user (refreshToken stays in SecureStore)
       return {
@@ -90,7 +93,7 @@ export const registerUser = createAsyncThunk(
 
 /**
  * Initialize auth on app startup
- * Restores user session from stored refresh token
+ * Restores user session from stored refresh token and user data
  */
 export const initAuth = createAsyncThunk(
   'auth/initAuth',
@@ -118,9 +121,18 @@ export const initAuth = createAsyncThunk(
       // Only refreshToken goes to SecureStore (sensitive)
       await authService.saveTokens(accessToken, newRefreshToken);
 
-      // Return ONLY accessToken to Redux (refreshToken stays in SecureStore)
+      // Restore user data from SecureStore (no extra API call needed)
+      const user = await authService.getUserData();
+
+      if (!user) {
+        console.log('[initAuth] No user data found in storage');
+        return null;
+      }
+
+      // Return accessToken AND user data to Redux
       return {
         accessToken,
+        user,
       };
     } catch (err) {
       console.error('[initAuth] Restore failed:', err?.message);
@@ -241,6 +253,12 @@ const authSlice = createSlice({
         state.isInitializing = false;
         if (action.payload) {
           state.accessToken = action.payload.accessToken;
+          // Restore user data from payload
+          state.name = action.payload.user.name;
+          state.email = action.payload.user.email;
+          state.role = action.payload.user.role;
+          state.plan = action.payload.user.plan;
+          state.coins = action.payload.user.coins;
           // refreshToken stays in SecureStore (never exposed in Redux)
         }
       })

@@ -7,15 +7,16 @@ import { ROUTES } from '../constants/routes';
 
 const Stack = createNativeStackNavigator();
 
-export default function AuthNavigator() {
+export default function AuthNavigator({ onGuestAccess }) {
   return (
     <Stack.Navigator
       initialRouteName={ROUTES.LOGIN}
       screenOptions={{ headerShown: false }}
     >
-      <Stack.Screen name={ROUTES.LOGIN} component={LoginScreen} />
+      <Stack.Screen name={ROUTES.LOGIN}>
+        {(props) => <LoginScreen {...props} onGuestAccess={onGuestAccess} />}
+      </Stack.Screen>
       <Stack.Screen name={ROUTES.SIGNUP} component={SignUpScreen} />
     </Stack.Navigator>
   );
 }
-

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 
 import AppNavigator from '../navigation/AppNavigator';
@@ -10,26 +10,21 @@ export default function AuthWrapper() {
   const dispatch = useDispatch();
   const accessToken = useSelector((state) => state.auth.accessToken);
   const isInitializing = useSelector((state) => state.auth.isInitializing);
+  const [guestMode, setGuestMode] = useState(false);
 
-  /**
-   * On app startup, restore auth session from stored refresh token
-   */
   useEffect(() => {
-    // Only initialize once
     dispatch(initAuth());
   }, [dispatch]);
 
-  /**
-   * While initializing, show splash screen
-   */
   if (isInitializing) {
     return <SplashScreen />;
   }
 
-  /**
-   * After initialization, show appropriate navigator
-   */
-  return accessToken ? <AppNavigator /> : <AuthNavigator />;
+  // Show main app if logged in OR in guest mode
+  if (accessToken || guestMode) {
+    return <AppNavigator />;
+  }
+
+  // Pass setGuestMode to AuthNavigator so login screen can have "Continue as Guest"
+  return <AuthNavigator onGuestAccess={() => setGuestMode(true)} />;
 }
-
-

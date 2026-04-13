@@ -1,15 +1,21 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   ScrollView,
   StyleSheet,
   Text,
   View,
   Pressable,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useDispatch, useSelector } from 'react-redux';
+
+
 import { theme } from '../constants/theme';
 import { ROUTES } from '../constants/routes';
+import { logoutUser, clearLogoutError } from '../redux/slices/authSlice';
 
 const FEATURE_ICONS = [
   { icon: 'play-circle-outline', label: '8K+ series' },
@@ -59,14 +65,42 @@ function MenuItem({ icon, label, right, badge, onPress }) {
 }
 
 export default function ProfileScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+  const name = useSelector((state) => state.auth.name);
+  const dispatch = useDispatch();
+  const { logout: logoutState } = useSelector((state) => state.auth);
+
+  // Show error alert when logout fails
+  useEffect(() => {
+    if (logoutState.error && !logoutState.isLoading) {
+      Alert.alert('Logout Failed', logoutState.error, [
+        { text: 'Retry', onPress: () => dispatch(logoutUser()) },
+        { text: 'Dismiss', onPress: () => dispatch(clearLogoutError()) },
+      ]);
+    }
+  }, [logoutState.error, logoutState.isLoading, dispatch]);
+
   function goToMembership() {
     navigation.navigate(ROUTES.MEMBERSHIP);
+  }
+
+  function goToMyWallet() {
+    navigation.navigate(ROUTES.MY_WALLET);
+  }
+
+  function handleLogout() {
+    // Dispatch logout action (clears tokens, calls backend)
+    dispatch(logoutUser());
+    // AuthWrapper will automatically handle navigation to login screen
   }
 
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={styles.container}
+      contentContainerStyle={[
+        styles.container,
+        { paddingTop: insets.top + 12 },
+      ]}
     >
       {/* Header */}
       <View style={styles.header}>
@@ -76,22 +110,15 @@ export default function ProfileScreen({ navigation }) {
           </View>
           <View>
             <View style={styles.loginRow}>
-              <Text style={styles.loginText}>Log in</Text>
+              <Text style={styles.loginText}>{name || 'Guest'}</Text>
               <Ionicons
                 name="chevron-forward"
                 size={16}
                 color={theme.white}
               />
             </View>
-            <Text style={styles.idText}>
-              ID 447126581{' '}
-              <Text style={styles.separator}>|</Text> Following 0
-            </Text>
           </View>
         </View>
-        <Pressable>
-          <Ionicons name="settings-outline" size={24} color={theme.white} />
-        </Pressable>
       </View>
 
       {/* Membership Banner */}
@@ -127,7 +154,11 @@ export default function ProfileScreen({ navigation }) {
       <View style={styles.menuCard}>
         <MenuItem icon="star-outline" label="Membership" onPress={goToMembership} />
         {MENU_ITEMS.map((item) => (
-          <MenuItem key={item.label} {...item} />
+          <MenuItem
+            key={item.label}
+            {...item}
+            onPress={item.label === 'My Wallet' ? goToMyWallet : item.onPress}
+          />
         ))}
       </View>
 
@@ -139,8 +170,14 @@ export default function ProfileScreen({ navigation }) {
         <MenuItem
           icon="log-out-outline"
           label="Log out"
-          onPress={() => navigation.replace(ROUTES.SIGNUP)}
+          onPress={handleLogout}
         />
+        {/* Show logout error if exists */}
+        {logoutState.error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Error: {logoutState.error}</Text>
+          </View>
+        )}
       </View>
 
       <View style={{ height: 30 }} />
@@ -162,7 +199,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingHorizontal: 20,
-    paddingTop: 16,
     paddingBottom: 20,
   },
   headerLeft: {
@@ -308,5 +344,18 @@ const styles = StyleSheet.create({
     color: theme.white,
     fontSize: 11,
     fontWeight: '700',
+  },
+  errorContainer: {
+    backgroundColor: '#ffebee',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: theme.crimson,
+  },
+  errorText: {
+    color: theme.crimson,
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

@@ -1,12 +1,13 @@
-import bcrypt from 'bcrypt';
 import {
   generateAccessToken,
   generateRefreshToken,
   hashRefreshToken,
   loginUser,
+  logoutUserService,
   registerAdmin,
   registerUser,
   verifyRefreshToken,
+  verifyStoredRefreshToken,
 } from './auth.service.js';
 import { validateRegister, validateLogin, validateClientType } from './auth.validation.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
@@ -158,6 +159,130 @@ export const registerAdminController = asyncHandler(async (req, res, next) => {
  * - web: expects refresh token in cookie: refreshToken=<token>
  */
 export const refreshToken = asyncHandler(async (req, res) => {
+  try {
+    const clientTypeHeader = req.headers['x-client-type'];
+    logger.debug(`[refreshToken] clientTypeHeader: ${clientTypeHeader}`);
+
+    // Validate client type
+    const clientTypeValidation = validateClientType(clientTypeHeader);
+    if (!clientTypeValidation.isValid) {
+      logger.warn(`[refreshToken] Invalid client type: ${clientTypeHeader}`);
+      throw new ApiError(400, clientTypeValidation.error);
+    }
+
+    const clientType = clientTypeValidation.value; // 'web' | 'mobile'
+    logger.debug(`[refreshToken] clientType: ${clientType}`);
+
+    let refreshTokenValue = null;
+
+    if (clientType === 'web') {
+      refreshTokenValue = req.cookies?.refreshToken;
+      logger.debug(`[refreshToken] web client - cookie refreshToken: ${refreshTokenValue ? 'present' : 'missing'}`);
+    } else {
+      const authHeader = req.headers.authorization;
+      logger.debug(`[refreshToken] mobile client - authHeader present: ${!!authHeader}`);
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        refreshTokenValue = authHeader.slice(7);
+      }
+    }
+
+    if (!refreshTokenValue || String(refreshTokenValue).trim().length === 0) {
+      logger.warn(`[refreshToken] Refresh token missing or empty`);
+      throw new ApiError(401, 'Refresh token missing or empty');
+    }
+
+    logger.debug(`[refreshToken] Verifying refresh token...`);
+    // 1) Verify refresh token signature + expiry
+    const decoded = verifyRefreshToken(refreshTokenValue);
+    logger.debug(`[refreshToken] Token decoded successfully, userId: ${decoded?.id}`);
+    
+    if (!decoded?.id) {
+      logger.warn(`[refreshToken] Invalid token payload - no userId`);
+      throw new ApiError(401, 'Invalid refresh token payload');
+    }
+
+    logger.debug(`[refreshToken] Fetching user from database...`);
+    // 2) Verify token matches the one stored (hashed) in DB
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+    });
+
+    if (!user) {
+      logger.warn(`[refreshToken] User not found for id: ${decoded.id}`);
+      throw new ApiError(401, 'User not found');
+    }
+
+    logger.debug(`[refreshToken] User found: ${user.email}`);
+
+    if (!user.refreshToken) {
+      logger.warn(`[refreshToken] No refresh token stored for user: ${user.email}`);
+      throw new ApiError(401, 'No refresh token stored for user');
+    }
+
+    logger.debug(`[refreshToken] Comparing stored refresh token...`);
+    const matches = await verifyStoredRefreshToken(refreshTokenValue, user.refreshToken);
+    if (!matches) {
+      logger.warn(`[refreshToken] Refresh token mismatch for user: ${user.email}`);
+      throw new ApiError(401, 'Refresh token is invalid');
+    }
+
+    logger.debug(`[refreshToken] Token match successful, generating new tokens...`);
+    // 3) Rotate tokens
+    const newAccessToken = generateAccessToken(user);
+    const newRefreshToken = generateRefreshToken(user);
+    const newRefreshTokenHash = await hashRefreshToken(newRefreshToken);
+
+    logger.debug(`[refreshToken] Updating user refresh token in database...`);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken: newRefreshTokenHash },
+    });
+
+    logger.info('Refresh token rotated successfully', {
+      userId: user.id,
+      email: user.email,
+      clientType,
+    });
+
+    // For web clients: set refresh token as secure http-only cookie
+    if (clientType === 'web') {
+      res.cookie('refreshToken', newRefreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+    }
+
+    const responseData = {
+      accessToken: newAccessToken,
+    };
+
+    // For mobile clients: include refresh token in response body
+    if (clientType !== 'web') {
+      responseData.refreshToken = newRefreshToken;
+    }
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, responseData, 'Token refreshed successfully'));
+  } catch (error) {
+    logger.error('[refreshToken] Error in refresh token controller:', {
+      error: error.message,
+      stack: error.stack,
+      statusCode: error.statusCode
+    });
+    throw error;
+  }
+});
+
+
+/**
+ * Logout user controller
+ * Middleware already verified token and attached req.user
+ * Just pass userId to logout service
+ */
+export const logout = asyncHandler(async (req, res) => {
   const clientTypeHeader = req.headers['x-client-type'];
 
   // Validate client type
@@ -168,80 +293,28 @@ export const refreshToken = asyncHandler(async (req, res) => {
 
   const clientType = clientTypeValidation.value; // 'web' | 'mobile'
 
-  let refreshTokenValue = null;
+  // Get userId from already-authenticated req.user (middleware verified it)
+  const userId = req.user.id;
 
-  if (clientType === 'web') {
-    refreshTokenValue = req.cookies?.refreshToken;
-  } else {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      refreshTokenValue = authHeader.slice(7);
-    }
-  }
+  // Call logout service to handle business logic
+  const user = await logoutUserService(userId);
 
-  if (!refreshTokenValue || String(refreshTokenValue).trim().length === 0) {
-    throw new ApiError(401, 'Refresh token missing');
-  }
-
-  // 1) Verify refresh token signature + expiry
-  const decoded = verifyRefreshToken(refreshTokenValue);
-  if (!decoded?.id) {
-    throw new ApiError(401, 'Invalid refresh token payload');
-  }
-
-  // 2) Verify token matches the one stored (hashed) in DB
-  const user = await prisma.user.findUnique({
-    where: { id: decoded.id },
-  });
-
-  if (!user) {
-    throw new ApiError(401, 'User not found');
-  }
-
-  if (!user.refreshToken) {
-    throw new ApiError(401, 'No refresh token stored for user');
-  }
-
-  const matches = await bcrypt.compare(refreshTokenValue, user.refreshToken);
-  if (!matches) {
-    throw new ApiError(401, 'Refresh token is invalid');
-  }
-
-  // 3) Rotate tokens
-  const newAccessToken = generateAccessToken(user);
-  const newRefreshToken = generateRefreshToken(user);
-  const newRefreshTokenHash = await hashRefreshToken(newRefreshToken);
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { refreshToken: newRefreshTokenHash },
-  });
-
-  logger.info('Refresh token rotated successfully', {
-    userId: user.id,
+  logger.info('Logout controller: User logged out successfully', {
+    userId: userId,
+    email: user.email,
     clientType,
   });
 
-  // For web clients: set refresh token as secure http-only cookie
+  // ✅ Clear refresh token cookie for web clients
   if (clientType === 'web') {
-    res.cookie('refreshToken', newRefreshToken, {
+    res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-  }
-
-  const responseData = {
-    accessToken: newAccessToken,
-  };
-
-  // For mobile clients: include refresh token in response body
-  if (clientType !== 'web') {
-    responseData.refreshToken = newRefreshToken;
   }
 
   return res
     .status(200)
-    .json(new ApiResponse(200, responseData, 'Token refreshed successfully'));
+    .json(new ApiResponse(200, null, 'Logout successful'));
 });

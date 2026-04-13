@@ -86,6 +86,21 @@ export const hashRefreshToken = async (token) => {
 };
 
 /**
+ * Verify stored refresh token matches the provided token
+ * @param {string} token - Plain refresh token from request
+ * @param {string} storedHash - Hashed refresh token from database
+ * @returns {Promise<boolean>} true if tokens match
+ */
+export const verifyStoredRefreshToken = async (token, storedHash) => {
+  try {
+    return await bcrypt.compare(token, storedHash);
+  } catch (error) {
+    logger.error('Error verifying stored refresh token', { error: error.message });
+    throw new ApiError(500, 'Failed to verify refresh token');
+  }
+};
+
+/**
  * Register new user
  */
 export const registerUser = async (userData) => {
@@ -277,5 +292,37 @@ export const registerAdmin = async (adminData) => {
       throw error;
     }
     throw new ApiError(500, 'Failed to register admin', [error.message]);
+  }
+};
+
+/**
+ * Logout user - null refresh token in database
+ */
+export const logoutUserService = async (userId) => {
+  try {
+    // Find user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, role: true }
+    });
+
+    if (!user) {
+      throw new ApiError(401, 'User not found');
+    }
+
+    // Null refresh token in DB
+    await prisma.user.update({
+      where: { id: userId },
+      data: { refreshToken: null }
+    });
+
+    logger.info('User logged out successfully', { userId, email: user.email });
+    return user;
+  } catch (error) {
+    logger.error('Logout service error', { error: error.message });
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, 'Failed to logout', [error.message]);
   }
 };

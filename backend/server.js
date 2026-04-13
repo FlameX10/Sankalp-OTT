@@ -14,7 +14,7 @@ import {
   disconnectDatabase,
 } from './config/db.js';
 
-const PORT = process.env.PORT || 3000;
+const PORT =  3000;
 
 let server;
 

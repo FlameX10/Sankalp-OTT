@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import logger from './config/logger.js';
 import { checkDatabaseHealth } from './config/db.js';
 import { errorHandler } from './middleware/error.middleware.js';
+import { ApiResponse } from './utils/ApiResponse.js';
 import authRouter from './modules/auth/auth.routes.js';
 
 // added from admin_ui_v2 (non-conflicting)
@@ -37,7 +38,14 @@ const corsOrigins = process.env.NODE_ENV === 'production'
   : ['http://localhost:5173', 'http://localhost:8081', 'http://localhost:19006', process.env.FRONTEND_ADMIN_URL, process.env.FRONTEND_APP_URL].filter(Boolean);
 
 app.use(cors({
-  origin: corsOrigins,
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+    'http://10.52.219.61:8081',
+    'http://10.52.219.61:3000',
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-client-type'],
@@ -129,14 +137,9 @@ app.use('/api/media', mediaRouter);
 
 // MAIN format
 app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: {
-      message: 'Route not found',
-      path: req.path,
-      method: req.method,
-    },
-  });
+  res.status(404).json(
+    new ApiResponse(404, null, 'Route not found')
+  );
 });
 
 // ============= ERROR HANDLER =============

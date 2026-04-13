@@ -10,7 +10,7 @@ import {
   StatusBar,
   TextInput,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 
@@ -108,10 +108,9 @@ export default function PopularScreen() {
         <View style={styles.headerIcons}>
           {/* Membership Crown Button */}
           <TouchableOpacity 
-            style={styles.crownButton} 
             onPress={() => navigation.navigate(ROUTES.PROFILE, { screen: ROUTES.MEMBERSHIP })}
           >
-            <Ionicons name="crown" size={18} color="#000" />
+            <FontAwesome6 name="crown" size={24} color="yellow" />
           </TouchableOpacity>
           <TouchableOpacity>
             <Ionicons name="gift" size={24} color="#FFD700" />
@@ -176,14 +175,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 15,
-  },
-  crownButton: {
-    backgroundColor: '#FFD700',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   tabContainer: {
     flexDirection: 'row',

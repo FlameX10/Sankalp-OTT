@@ -54,7 +54,7 @@ const requestQueue = new RequestQueue();
  */
 
 export const api = axios.create({
-  baseURL: 'http://10.52.219.61:3000/api/v1',
+  baseURL: 'http://10.52.219.30:3000/api/v1',
   headers: {
     'Content-Type': 'application/json',
     'x-client-type': authService.getClientType(),

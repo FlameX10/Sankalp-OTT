@@ -14,6 +14,18 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { formatCount } from './shortVideoPlayer/utils';
 import { theme } from '../constants/theme';
+import { API_BASE_URL } from '../constants/config';
+
+// Debug log for thumbnails
+const debugThumbnail = (source, details_tn, item_tn, details_id, item_id) => {
+  console.log('[DramaDetailsSheet-thumbnail]', {
+    posterSource: source,
+    detailsThumbnailUrl: details_tn,
+    itemThumbnailUrl: item_tn,
+    detailsShowId: details_id,
+    itemShowId: item_id,
+  });
+};
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_HEIGHT = Math.round(SCREEN_HEIGHT * 0.9);
@@ -105,11 +117,29 @@ export default function DramaDetailsSheetConnected({
   // Move useMemo BEFORE the early return
   const posterSource = useMemo(() => {
     if (!item) return null;
+
+    // Helper to resolve thumbnail URLs to absolute URLs
+    const resolveThumbnailUrl = (url) => {
+      if (!url) return null;
+      if (url.startsWith('http')) return url; // already absolute
+      return `${API_BASE_URL}${url}`; // make it absolute
+    };
+
     if (details?.show_id === item.show_id && details?.thumbnail_url) {
-      return { uri: details.thumbnail_url };
+      const resolved = resolveThumbnailUrl(details.thumbnail_url);
+      debugThumbnail({ uri: resolved }, details?.thumbnail_url, item?.thumbnail_url, details?.show_id, item?.show_id);
+      return { uri: resolved };
     }
-    if (item.thumbnail_url) return { uri: item.thumbnail_url };
-    if (item.image) return item.image;
+    if (item.thumbnail_url) {
+      const resolved = resolveThumbnailUrl(item.thumbnail_url);
+      debugThumbnail({ uri: resolved }, details?.thumbnail_url, item?.thumbnail_url, details?.show_id, item?.show_id);
+      return { uri: resolved };
+    }
+    if (item.image) {
+      debugThumbnail(item.image, details?.thumbnail_url, item?.thumbnail_url, details?.show_id, item?.show_id);
+      return item.image;
+    }
+    debugThumbnail(null, details?.thumbnail_url, item?.thumbnail_url, details?.show_id, item?.show_id);
     return null;
   }, [details?.thumbnail_url, item?.thumbnail_url, item?.image, item?.show_id, details?.show_id]);
 
@@ -166,7 +196,13 @@ export default function DramaDetailsSheetConnected({
           <View style={styles.topRow}>
             <View style={styles.posterRow}>
               {posterSource ? (
-                <Image source={posterSource} style={styles.poster} resizeMode="cover" />
+                <Image
+                  source={posterSource}
+                  style={styles.poster}
+                  resizeMode="cover"
+                  onLoad={() => console.log('[Image-onLoad] Poster loaded successfully')}
+                  onError={(err) => console.log('[Image-onError] Failed to load poster:', err.error)}
+                />
               ) : (
                 <View style={[styles.poster, styles.posterFallback]} />
               )}

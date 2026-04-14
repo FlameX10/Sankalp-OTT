@@ -200,6 +200,7 @@ export default function ForYouScreen() {
         onRangeChange={handleRangeChange}
         onClose={handleCloseSheet}
         onEpisodePress={handleEpisodePress}
+        streamBase={API_BASE_URL}
       />
     </View>
   );

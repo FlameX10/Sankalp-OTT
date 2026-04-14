@@ -26,13 +26,13 @@ router.post('/confirm/image', devAdmin('Dramas'), ctrl.confirmImageUpload);
 // Transcode status
 router.get('/status/:episodeId', ctrl.getTranscodeStatus);
 
-// Image proxy — serves thumbnails/banners: /api/media/image/:type/:entityId
-router.get('/image/:type/:entityId', ctrl.getImage);
-
 // HLS proxy — new path: /api/media/hls/:showId/:episodeId/*
 router.get('/hls/:showId/:episodeId/*', ctrl.hlsProxy);
 
 // Playback URL
 router.get('/play/:episodeId', allowGuest, ctrl.getPlayUrl);
+
+// Image proxy — thumbnail/banner served through backend so mobile never hits MinIO directly
+router.get('/image/:showId/:type', ctrl.imageProxy);
 
 export default router;

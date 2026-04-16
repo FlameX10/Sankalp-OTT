@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VideoView } from 'expo-video';
 
@@ -37,6 +38,13 @@ export default function ShortVideoReelItem({
   streamBase = '',
 }) {
   const insets = useSafeAreaInsets();
+  let tabBarHeight = 0;
+  try {
+    // This throws if the component is rendered outside a Bottom Tab screen.
+    tabBarHeight = useBottomTabBarHeight();
+  } catch {
+    tabBarHeight = 0;
+  }
   const [saved, setSaved] = useState(false);
 
   const isLocked = item.is_locked;
@@ -127,25 +135,11 @@ export default function ShortVideoReelItem({
       ) : null}
 
       <View
-        style={[styles.uiOverlay, { paddingBottom: insets.bottom + 78 }]}
+        // Keep content above bottom navigation, without leaving a big gap.
+        style={[styles.uiOverlay, { paddingBottom: insets.bottom}]}
         pointerEvents="box-none"
       >
         <View style={styles.sideActionsColumn}>
-          {!isLocked && isActive ? (
-            <TouchableOpacity
-              style={styles.playPauseButton}
-              onPress={togglePlayback}
-              activeOpacity={0.85}
-            >
-              <Ionicons
-                name={manuallyPaused ? 'play' : 'pause'}
-                size={16}
-                color="#fff"
-                style={manuallyPaused ? styles.playIconNudge : null}
-              />
-            </TouchableOpacity>
-          ) : null}
-
           <SideAction
             icon={saved ? 'bookmark' : 'bookmark-outline'}
             label={item.view_count > 0 ? formatCount(item.view_count) : ''}

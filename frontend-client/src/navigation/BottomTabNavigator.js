@@ -67,6 +67,12 @@ export default function BottomTabNavigator() {
         name={ROUTES.PROFILE}
         component={ProfileStackNavigator}
         options={{ tabBarLabel: 'Profile' }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            // Always open Profile root when user taps Profile tab.
+            navigation.navigate(ROUTES.PROFILE, { screen: ROUTES.PROFILE });
+          },
+        })}
       />
     </Tab.Navigator>
   );

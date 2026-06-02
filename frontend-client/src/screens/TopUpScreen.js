@@ -36,6 +36,24 @@ export default function TopUpScreen() {
   const returnToShowPlayer = !!route.params?.returnToShowPlayer;
 
   const handleBackToPlayer = useCallback(() => {
+    // Pop back to the existing ShowPlayer route instead of pushing a new one.
+    // This prevents: TopUp -> ShowPlayer -> TopUp bounce.
+    let nav = navigation;
+    try {
+      while (typeof nav?.getParent === 'function') {
+        const parent = nav.getParent();
+        if (!parent) break;
+        nav = parent;
+      }
+    } catch {
+      // ignore
+    }
+
+    if (nav?.canGoBack?.()) {
+      nav.goBack();
+      return;
+    }
+
     navigation.navigate(ROUTES.SHOW_PLAYER, {
       fromHome: !!route.params?.fromHome,
       fromForYou: !!route.params?.fromForYou,

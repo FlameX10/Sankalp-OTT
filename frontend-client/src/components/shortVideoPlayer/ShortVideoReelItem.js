@@ -60,6 +60,7 @@ export default function ShortVideoReelItem({
   showOttOverlayControls = false,
   onReturnToDramaSheet,
   walletReturnParams = null,
+  showEpisodeStrip = true,
 }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -551,18 +552,28 @@ export default function ShortVideoReelItem({
             />
           ) : null}
 
-          <TouchableOpacity
-            style={styles.episodeStrip}
-            onPress={handleOpenEpisodesOrReturn}
-          >
-            <Ionicons name="play-circle" size={20} color={shortVideoTheme.crimson} />
-            <Text style={styles.episodeText}>
-              EP.{item.episode_num} / EP.{item.total_episodes}
-            </Text>
-            <View style={{ flex: 1 }} />
-            <Text style={styles.watchAllText}>Watch All</Text>
-            <Ionicons name="chevron-forward" size={16} color={shortVideoTheme.muted} />
-          </TouchableOpacity>
+          {showEpisodeStrip ? (
+            <TouchableOpacity
+              style={styles.episodeStrip}
+              onPress={handleOpenEpisodesOrReturn}
+            >
+              <Ionicons
+                name="play-circle"
+                size={20}
+                color={shortVideoTheme.crimson}
+              />
+              <Text style={styles.episodeText}>
+                EP.{item.episode_num} / EP.{item.total_episodes}
+              </Text>
+              <View style={{ flex: 1 }} />
+              <Text style={styles.watchAllText}>Watch All</Text>
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={shortVideoTheme.muted}
+              />
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
 

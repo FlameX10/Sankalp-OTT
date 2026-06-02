@@ -251,6 +251,7 @@ export default function ShowPlayerScreen({ navigation }) {
             walletReturnParams={
               fromHome ? { fromHome: true } : fromForYou ? { fromForYou: true } : null
             }
+            showEpisodeStrip={dramaSheetSource === 'forYou'}
             // Seek to saved progress on first render of the starting episode
             initialSeekSec={
               index === startIndex && !hasSeenRef.current

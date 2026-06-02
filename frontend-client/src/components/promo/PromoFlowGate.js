@@ -328,7 +328,10 @@ export default function PromoFlowGate({ children }) {
     advance();
     navigation.navigate(ROUTES.MAIN_TABS, {
       screen: ROUTES.PROFILE,
-      params: { screen: ROUTES.MEMBERSHIP },
+      params: {
+        screen: ROUTES.MEMBERSHIP,
+        params: { backToHome: true },
+      },
     });
   };
 

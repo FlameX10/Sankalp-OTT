@@ -296,7 +296,14 @@ export default function PopularScreen() {
         </View>
 
         <View style={styles.headerIcons}>
-          <TouchableOpacity onPress={() => navigation.navigate(ROUTES.PROFILE, { screen: ROUTES.MEMBERSHIP })}>
+          <TouchableOpacity
+            onPress={() =>
+              navigation.navigate(ROUTES.PROFILE, {
+                screen: ROUTES.MEMBERSHIP,
+                params: { backToHome: true },
+              })
+            }
+          >
             <FontAwesome6 name="crown" size={22} color="#FFD700" />
           </TouchableOpacity>
           <TouchableOpacity onPress={goToEarnRewards} hitSlop={8}>

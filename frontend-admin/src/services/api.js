@@ -268,6 +268,20 @@ export const topupApi = {
   toggle: (planId) => api.patch(`/v1/admin/topup/plans/${planId}/toggle`),
 };
 
+// ── Sub-Admin Management ──
+export const subAdminApi = {
+  getAll: () => api.get('/v1/admin/subadmins'),
+  getById: (subAdminId) => api.get(`/v1/admin/subadmins/${subAdminId}`),
+  getSections: () => api.get('/v1/admin/subadmins/sections/available'),
+  create: (data) => api.post('/v1/admin/subadmins', data),
+  updateSections: (subAdminId, sections) =>
+    api.patch(`/v1/admin/subadmins/${subAdminId}/sections`, { sections }),
+  resetPassword: (subAdminId, newPassword) =>
+    api.patch(`/v1/admin/subadmins/${subAdminId}/password`, { newPassword }),
+  toggleStatus: (subAdminId) => api.patch(`/v1/admin/subadmins/${subAdminId}/status`),
+  delete: (subAdminId) => api.delete(`/v1/admin/subadmins/${subAdminId}`),
+};
+
 // ── Admin Users ──
 export const usersApi = {
   getAll: () => api.get('/v1/admin/users'),

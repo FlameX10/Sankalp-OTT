@@ -18,6 +18,7 @@ import Coins         from './pages/Coins.jsx'
 import Notifications from './pages/Notifications.jsx'
 import Analytics     from './pages/Analytics.jsx'
 import Roles         from './pages/Roles.jsx'
+import SubAdmins     from './pages/SubAdmins.jsx'
 import CMS           from './pages/CMS.jsx'
 
 // Route map — add a new page here with one line
@@ -33,6 +34,7 @@ const ROUTES = {
   notifications: Notifications,
   analytics:     Analytics,
   roles:         Roles,
+  subadmins:     SubAdmins,
   cms:           CMS,
 }
 

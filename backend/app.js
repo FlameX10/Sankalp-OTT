@@ -11,6 +11,7 @@ import { errorHandler } from './middleware/error.middleware.js';
 import { ApiResponse } from './utils/ApiResponse.js';
 import authRouter from './modules/auth/auth.routes.js';
 import adminRouter from './modules/admin/admin.routes.js';
+import subAdminRouter from './modules/admin/subadmin.routes.js';
 import membershipRouter from './modules/membership/membership.routes.js';
 import topupRouter from './modules/topup/topup.routes.js';
 
@@ -146,6 +147,7 @@ app.get("/test", (req, res) => {
 
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/admin', adminRouter);
+app.use('/api/v1/admin/subadmins', subAdminRouter);
 app.use('/api/v1/membership', membershipRouter);
 app.use('/api/v1/admin/membership', membershipRouter);
 app.use('/api/v1/topup', topupRouter);

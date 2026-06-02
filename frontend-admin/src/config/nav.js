@@ -30,9 +30,10 @@ export const NAV_CONFIG = [
   {
     section: 'System',
     items: [
-      { id: 'analytics', label: 'Analytics & Reports',  badge: null },
-      { id: 'roles',     label: 'Roles & Permissions',  badge: null },
-      { id: 'cms',       label: 'CMS Pages',             badge: null },
+      { id: 'analytics',  label: 'Analytics & Reports',  badge: null },
+      { id: 'roles',      label: 'Roles & Permissions',  badge: null },
+      { id: 'subadmins',  label: 'Sub-Admins',           badge: null },
+      { id: 'cms',        label: 'CMS Pages',             badge: null },
     ],
   },
 ]
@@ -49,5 +50,6 @@ export const PAGE_META = {
   notifications: { title: 'Notifications',        subtitle: 'Push messages & alerts' },
   analytics:     { title: 'Analytics & Reports',  subtitle: 'Growth & performance reports' },
   roles:         { title: 'Roles & Permissions',  subtitle: 'Admin access control' },
+  subadmins:     { title: 'Sub-Admins',           subtitle: 'Manage sub-administrator accounts' },
   cms:           { title: 'CMS Pages',            subtitle: 'Static content pages' },
 }

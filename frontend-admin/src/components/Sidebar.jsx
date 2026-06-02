@@ -81,6 +81,14 @@ const NAV_ICONS = {
       <path d="M6 8l1.5 1.5L10 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity=".9"/>
     </>
   ),
+  subadmins: (
+    <>
+      <circle cx="5" cy="5" r="2.5" fill="currentColor" opacity=".8"/>
+      <path d="M1 12c0-1.5 1.5-2.5 4-2.5s4 1 4 2.5" stroke="currentColor" strokeWidth="1.2" fill="none" opacity=".6"/>
+      <circle cx="11" cy="5" r="2" fill="currentColor" opacity=".5"/>
+      <path d="M9 12c0-1.2 1-2 3-2s3.2 1 3 2" stroke="currentColor" strokeWidth="1.2" fill="none" opacity=".4"/>
+    </>
+  ),
   cms: (
     <>
       <rect x="2" y="2" width="12" height="12" rx="1.5" fill="currentColor" opacity=".2"/>

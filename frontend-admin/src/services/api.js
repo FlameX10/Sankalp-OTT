@@ -162,10 +162,14 @@ uploadApi.interceptors.response.use(
 
 // ── Auth ──
 export const authApi = {
-  login: (email, password) => 
+  login: (email, password, { adminPanel = false } = {}) =>
     api.post('/v1/auth/login', { email, password }, {
-      headers: { 'x-client-type': 'web' }
+      headers: {
+        'x-client-type': 'web',
+        ...(adminPanel ? { 'x-admin-panel': 'true' } : {}),
+      },
     }),
+  getAdminProfile: () => api.get('/v1/admin/me'),
   logout: () => {
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_user');
@@ -283,6 +287,15 @@ export const coinsApi = {
   saveRules: (rules) => api.put('/v1/admin/coins/rules', rules),
   getMetrics: () => api.get('/v1/admin/coins/metrics'),
   getTransactions: (params) => api.get('/v1/admin/coins/transactions', { params }),
+};
+
+// ── Sub-admins & permissions (main admin only) ──
+export const subAdminApi = {
+  list: () => api.get('/v1/admin/sub-admins'),
+  create: (data) => api.post('/v1/admin/sub-admins', data),
+  update: (id, data) => api.patch(`/v1/admin/sub-admins/${id}`, data),
+  delete: (id) => api.delete(`/v1/admin/sub-admins/${id}`),
+  activityLogs: (limit = 50) => api.get('/v1/admin/activity-logs', { params: { limit } }),
 };
 
 // ── Banners ──

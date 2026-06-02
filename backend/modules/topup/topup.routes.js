@@ -13,41 +13,18 @@ import {
 
 const router = express.Router();
 
-/**
- * =====================================================
- * PUBLIC ROUTES (No auth required)
- * =====================================================
- */
-
-// GET all active top-up plans
+// Public routes
 router.get('/plans', getActiveTopUpPlans);
 
-/**
- * =====================================================
- * ADMIN ROUTES (Auth + Admin required)
- * =====================================================
- */
-
-// All admin routes require authentication and admin role
+// Admin routes (topup section)
 router.use(requireAuth);
-router.use(requireAdmin());
+router.use(requireAdmin('topup'));
 
-// GET all top-up plans with stats
 router.get('/plans', getAllTopUpPlansHandler);
-
-// GET single top-up plan
 router.get('/plans/:planId', getTopUpPlan);
-
-// POST create new top-up plan
 router.post('/plans', createTopUpPlanHandler);
-
-// PATCH update top-up plan
 router.patch('/plans/:planId', updateTopUpPlanHandler);
-
-// PATCH toggle plan active status
 router.patch('/plans/:planId/toggle', toggleTopUpPlanStatusHandler);
-
-// DELETE top-up plan
 router.delete('/plans/:planId', deleteTopUpPlanHandler);
 
 export default router;

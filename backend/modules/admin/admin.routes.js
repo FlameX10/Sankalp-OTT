@@ -1,6 +1,6 @@
 import express from 'express';
 import { requireAuth } from '../../middleware/auth.middleware.js';
-import { requireAdmin } from '../../middleware/admin.middleware.js';
+import { requireAdmin, requireAnyAdmin, requireMainAdmin } from '../../middleware/admin.middleware.js';
 import {
   getAllUsers,
   toggleUserStatus,
@@ -17,67 +17,49 @@ import {
   getDashboardMetrics,
   getAnalyticsReport,
 } from './admin.controller.js';
+import {
+  getAdminMe,
+  getSubAdmins,
+  postSubAdmin,
+  patchSubAdmin,
+  removeSubAdmin,
+  getActivityLogs,
+} from './subadmin.controller.js';
 
 const router = express.Router();
 
-/**
- * All admin routes require authentication and admin role
- */
-router.use(requireAuth);
-router.use(requireAdmin());
+// ── Profile (any admin) ──
+router.get('/me', requireAnyAdmin(), getAdminMe);
 
-// GET all users
-router.get('/users', getAllUsers);
+// ── Sub-admin management (main admin only) ──
+router.get('/sub-admins', requireMainAdmin(), getSubAdmins);
+router.post('/sub-admins', requireMainAdmin(), postSubAdmin);
+router.patch('/sub-admins/:id', requireMainAdmin(), patchSubAdmin);
+router.delete('/sub-admins/:id', requireMainAdmin(), removeSubAdmin);
+router.get('/activity-logs', requireMainAdmin(), getActivityLogs);
 
-// GET user profile with details
-router.get('/users/:userId/profile', getUserProfile);
+// ── Dashboard ──
+router.get('/dashboard/metrics', requireAdmin('dashboard'), getDashboardMetrics);
 
-// PATCH toggle block/unblock user
-router.patch('/users/:userId/status', toggleUserStatus);
+// ── Users ──
+router.get('/users', requireAuth, requireAdmin('users'), getAllUsers);
+router.get('/users/:userId/profile', requireAuth, requireAdmin('users'), getUserProfile);
+router.patch('/users/:userId/status', requireAuth, requireAdmin('users'), toggleUserStatus);
+router.patch('/users/:userId/coins', requireAuth, requireAdmin('users'), adjustUserCoins);
 
-// PATCH adjust user coins
-router.patch('/users/:userId/coins', adjustUserCoins);
+// ── Coins ──
+router.get('/coins/rules', requireAuth, requireAdmin('coins'), getCoinRules);
+router.put('/coins/rules', requireAuth, requireAdmin('coins'), saveCoinRules);
+router.get('/coins/metrics', requireAuth, requireAdmin('coins'), getCoinMetrics);
+router.get('/coins/transactions', requireAuth, requireAdmin('coins'), getCoinTransactions);
 
-// ─────────────────────────────────────────────────────────────────
-// COIN MANAGEMENT ENDPOINTS
-// ─────────────────────────────────────────────────────────────────
+// ── Analytics ──
+router.get('/reports/:reportType', requireAuth, requireAdmin('analytics'), getAnalyticsReport);
 
-// GET coin rules
-router.get('/coins/rules', getCoinRules);
-
-// PUT save coin rules
-router.put('/coins/rules', saveCoinRules);
-
-// GET coin metrics
-router.get('/coins/metrics', getCoinMetrics);
-
-// GET coin transactions
-router.get('/coins/transactions', getCoinTransactions);
-
-// ─────────────────────────────────────────────────────────────────
-// DASHBOARD METRICS ENDPOINTS
-// ─────────────────────────────────────────────────────────────────
-
-// GET dashboard metrics by period
-router.get('/dashboard/metrics', getDashboardMetrics);
-
-// GET analytics report data
-router.get('/reports/:reportType', getAnalyticsReport);
-
-// ─────────────────────────────────────────────────────────────────
-// BANNER MANAGEMENT ENDPOINTS
-// ─────────────────────────────────────────────────────────────────
-
-// GET all banners
-router.get('/banners', getBanners);
-
-// POST create banner
-router.post('/banners', createBanner);
-
-// PUT update banner
-router.put('/banners/:id', updateBanner);
-
-// DELETE banner
-router.delete('/banners/:id', deleteBanner);
+// ── Banners ──
+router.get('/banners', requireAuth, requireAdmin('banners'), getBanners);
+router.post('/banners', requireAuth, requireAdmin('banners'), createBanner);
+router.put('/banners/:id', requireAuth, requireAdmin('banners'), updateBanner);
+router.delete('/banners/:id', requireAuth, requireAdmin('banners'), deleteBanner);
 
 export default router;

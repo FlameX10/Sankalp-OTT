@@ -10,25 +10,25 @@ const router = express.Router();
 // ──────────────────────────────────
 
 // Get all available dramas for notification targeting
-router.get('/admin/dramas', requireAuth, requireAdmin(), controller.getAllDramas);
+router.get('/admin/dramas', requireAuth, requireAdmin('notifications'), controller.getAllDramas);
 
 // Send a notification to users
-router.post('/admin/send', requireAuth, requireAdmin(), controller.sendNotification);
+router.post('/admin/send', requireAuth, requireAdmin('notifications'), controller.sendNotification);
 
 // Get notification statistics
-router.get('/admin/stats', requireAuth, requireAdmin(), controller.getNotificationStats);
+router.get('/admin/stats', requireAuth, requireAdmin('notifications'), controller.getNotificationStats);
 
 // Get all sent notifications
-router.get('/admin/sent', requireAuth, requireAdmin(), controller.getSentNotifications);
+router.get('/admin/sent', requireAuth, requireAdmin('notifications'), controller.getSentNotifications);
 
 // Get notification configuration
-router.get('/admin/config', requireAuth, requireAdmin(), controller.getNotificationConfig);
+router.get('/admin/config', requireAuth, requireAdmin('notifications'), controller.getNotificationConfig);
 
 // Update notification configuration
-router.put('/admin/config', requireAuth, requireAdmin(), controller.updateNotificationConfig);
+router.put('/admin/config', requireAuth, requireAdmin('notifications'), controller.updateNotificationConfig);
 
 // Delete a sent notification broadcast
-router.delete('/admin/sent', requireAuth, requireAdmin(), controller.deleteNotification);
+router.delete('/admin/sent', requireAuth, requireAdmin('notifications'), controller.deleteNotification);
 
 // ──────────────────────────────────
 // USER ROUTES

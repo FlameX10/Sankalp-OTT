@@ -1,6 +1,8 @@
 import { useDispatch, useSelector } from 'react-redux'
 import { setActivePage, selectActivePage } from '../store/navigationSlice.js'
+import { selectUser } from '../store/authSlice.js'
 import { NAV_CONFIG } from '../config/nav.js'
+import { filterNavByPermissions } from '../config/permissions.js'
 
 const NAV_ICONS = {
   dashboard: (
@@ -100,8 +102,13 @@ function NavIcon({ id }) {
 }
 
 export default function Sidebar() {
-  const dispatch   = useDispatch()
-  const active     = useSelector(selectActivePage)
+  const dispatch = useDispatch()
+  const active   = useSelector(selectActivePage)
+  const user     = useSelector(selectUser)
+  const navItems = filterNavByPermissions(NAV_CONFIG, user)
+
+  const roleLabel = user?.role === 'admin' ? 'admin' : user?.role === 'sub_admin' ? 'sub-admin' : 'user'
+
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
@@ -113,7 +120,7 @@ export default function Sidebar() {
       </div>
 
       <nav style={{ flex: 1, paddingTop: 8 }}>
-        {NAV_CONFIG.map(group => (
+        {navItems.map(group => (
           <div key={group.section}>
             <div className="nav-section">{group.section}</div>
             {group.items.map(item => (
@@ -138,8 +145,10 @@ export default function Sidebar() {
             <path d="M2 14c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity=".5"/>
           </svg>
           <div style={{ flex: 1, overflow: 'hidden' }}>
-            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Admin User</div>
-            <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>super admin</div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user?.name || 'Admin User'}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{roleLabel}</div>
           </div>
         </div>
       </div>

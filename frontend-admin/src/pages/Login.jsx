@@ -3,6 +3,8 @@ import { useDispatch } from 'react-redux'
 import { LogIn, AlertCircle } from 'lucide-react'
 import { authApi } from '../services/api.js'
 import { loginSuccess } from '../store/authSlice.js'
+import { setActivePage } from '../store/navigationSlice.js'
+import { getFirstAllowedPage } from '../config/permissions.js'
 
 export default function Login() {
   const dispatch = useDispatch()
@@ -23,14 +25,23 @@ export default function Login() {
         return
       }
 
-      const response = await authApi.login(email, password)
+      const response = await authApi.login(email, password, { adminPanel: true })
       const { data } = response.data
 
       // Write to localStorage FIRST so axios interceptor picks it up immediately
       localStorage.setItem('admin_token', data.accessToken)
       localStorage.setItem('admin_user', JSON.stringify(data.user))
-      // Then update Redux state
       dispatch(loginSuccess({ token: data.accessToken, user: data.user }))
+      let user = data.user
+      try {
+        const me = await authApi.getAdminProfile()
+        if (me.data?.data) {
+          user = me.data.data
+          localStorage.setItem('admin_user', JSON.stringify(user))
+          dispatch(loginSuccess({ token: data.accessToken, user }))
+        }
+      } catch { /* use login payload */ }
+      dispatch(setActivePage(getFirstAllowedPage(user)))
     } catch (err) {
       const message = err.response?.data?.message || 'Login failed. Please check credentials.'
       setError(message)

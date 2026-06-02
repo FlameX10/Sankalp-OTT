@@ -65,7 +65,7 @@ app.use(cors({
   ].filter(Boolean),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-client-type'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-client-type', 'x-admin-panel'],
 }));
 
 app.use(helmet());

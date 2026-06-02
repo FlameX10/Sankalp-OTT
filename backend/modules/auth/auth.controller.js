@@ -28,6 +28,7 @@ import { ApiResponse } from '../../utils/ApiResponse.js';
 import { ApiError } from '../../utils/ApiError.js';
 import logger from '../../config/logger.js';
 import { getPrismaClient } from '../../config/db.js';
+import { getAdminProfile } from '../admin/subadmin.service.js';
 
 const prisma = getPrismaClient();
 
@@ -92,11 +93,23 @@ export const login = asyncHandler(async (req, res, next) => {
   // Sanitize email
   const sanitizedEmail = String(email).toLowerCase().trim();
   
+  const isAdminPanel = req.headers['x-admin-panel'] === 'true';
+
   // Login user
   const result = await loginUser({
     email: sanitizedEmail,
     password
   });
+
+  // Admin panel: only ADMIN and SUB_ADMIN may sign in
+  if (isAdminPanel) {
+    if (result.user.role !== 'ADMIN' && result.user.role !== 'SUB_ADMIN') {
+      throw new ApiError(403, 'Admin panel access denied');
+    }
+    if (result.user.isBlocked) {
+      throw new ApiError(403, 'Your admin account has been deactivated');
+    }
+  }
 
   logger.info('User login successful', { 
     userId: result.user.id, 
@@ -114,9 +127,17 @@ export const login = asyncHandler(async (req, res, next) => {
     });
   }
 
+  // Format user for admin panel (role + sections)
+  let userPayload = result.user;
+  if (isAdminPanel) {
+    const { password: _, refreshToken: __, sub_admin_access, ...rest } = result.user;
+    const profile = await getAdminProfile(rest.id, rest.role);
+    userPayload = profile;
+  }
+
   // Response with tokens
   const responseData = {
-    user: result.user,
+    user: userPayload,
     accessToken: result.accessToken
   };
 

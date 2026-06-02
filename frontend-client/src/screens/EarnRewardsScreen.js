@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRoute } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 
 import CoinIcon from '../components/CoinIcon';
@@ -20,6 +21,7 @@ import {
   walletApiErrorMessage,
 } from '../components/rewards/dailyCheckinApi';
 import { theme } from '../constants/theme';
+import { ROUTES } from '../constants/routes';
 import { setCoins } from '../redux/slices/authSlice';
 import * as authService from '../services/authService';
 
@@ -69,7 +71,8 @@ function DayCard({ day, coins, state }) {
   );
 }
 
-export default function EarnRewardsScreen() {
+export default function EarnRewardsScreen({ navigation }) {
+  const route = useRoute();
   const dispatch = useDispatch();
   const accessToken = useSelector((s) => s.auth?.accessToken);
   const coins = useSelector((s) => s.auth?.coins);
@@ -79,6 +82,52 @@ export default function EarnRewardsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [claiming, setClaiming] = useState(false);
+  const returningHomeRef = useRef(false);
+  const backToHome = !!route.params?.backToHome;
+
+  const returnToHome = useCallback(() => {
+    returningHomeRef.current = true;
+    navigation.reset({
+      index: 0,
+      routes: [{ name: ROUTES.PROFILE }],
+    });
+    navigation.getParent()?.navigate(ROUTES.HOME);
+  }, [navigation]);
+
+  useEffect(() => {
+    if (!backToHome) return undefined;
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (returningHomeRef.current) return;
+      if (!['GO_BACK', 'POP'].includes(e.data.action.type)) return;
+      e.preventDefault();
+      returnToHome();
+    });
+    return unsubscribe;
+  }, [navigation, backToHome, returnToHome]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <Pressable
+          onPress={() => {
+            if (backToHome) {
+              returnToHome();
+              return;
+            }
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate(ROUTES.PROFILE);
+            }
+          }}
+          hitSlop={12}
+          style={{ paddingLeft: 4 }}
+        >
+          <Ionicons name="chevron-back" size={26} color={theme.white} />
+        </Pressable>
+      ),
+    });
+  }, [navigation, backToHome, returnToHome]);
 
   const loadStatus = useCallback(async (isRefresh = false) => {
     if (!accessToken) return;

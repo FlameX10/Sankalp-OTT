@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Image,
   Modal,
   Pressable,
@@ -60,6 +61,7 @@ export default function ShortVideoReelItem({
   showOttOverlayControls = false,
   onReturnToDramaSheet,
   walletReturnParams = null,
+  showEpisodeStrip = true,
 }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -72,8 +74,19 @@ export default function ShortVideoReelItem({
   const [speedModalVisible, setSpeedModalVisible] = useState(false);
   const [videoError, setVideoError] = useState(null);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [controlsInteractionTick, setControlsInteractionTick] = useState(0);
+  const controlsOpacity = useRef(new Animated.Value(1)).current;
   const hideControlsTimerRef = useRef(null);
   const layoutHeight = itemHeight || SCREEN_HEIGHT;
+  const hideControlsDelay = showOttOverlayControls ? 2000 : 3000;
+  const bottomControlsPadding = showOttOverlayControls
+    ? (itemHeight ? 10 : insets.bottom)
+    : itemHeight
+      ? Math.max(insets.bottom + 34, 44)
+      : Math.max(insets.bottom + 18, 24);
+  const dramaVideoMaxHeight = Math.max(layoutHeight - insets.top - bottomControlsPadding - 24, 0);
+  const dramaVideoHeight = Math.min(SCREEN_WIDTH * (16 / 9), dramaVideoMaxHeight);
+  const dramaVideoTop = Math.max(insets.top + 12, (layoutHeight - dramaVideoHeight) / 2);
 
   useEffect(() => {
     if (accessToken && !bookmarksLoaded) {
@@ -115,6 +128,15 @@ export default function ShortVideoReelItem({
     initialDuration: item.duration_sec || 0,
     onProgressUpdate,
   });
+  const showMainOverlay = showOttOverlayControls || controlsVisible || manuallyPaused;
+
+  useEffect(() => {
+    Animated.timing(controlsOpacity, {
+      toValue: showMainOverlay ? 1 : 0,
+      duration: showMainOverlay ? 180 : 240,
+      useNativeDriver: true,
+    }).start();
+  }, [controlsOpacity, showMainOverlay]);
 
   // Wrap onLoad to seek to initialSeekSec after video metadata is loaded
   const wrappedOnLoad = useCallback((data) => {
@@ -166,10 +188,11 @@ export default function ShortVideoReelItem({
   }, []);
 
   useEffect(() => {
-    if (!showOttOverlayControls) return undefined;
     return () => {
       clearHideControlsTimer();
-      StatusBar.setHidden(false);
+      if (showOttOverlayControls) {
+        StatusBar.setHidden(false);
+      }
     };
   }, [showOttOverlayControls, clearHideControlsTimer]);
 
@@ -179,24 +202,27 @@ export default function ShortVideoReelItem({
   }, [isActive, showOttOverlayControls]);
 
   useEffect(() => {
-    if (!showOttOverlayControls) return;
+    clearHideControlsTimer();
     setControlsVisible(true);
-  }, [item.episode_id, showOttOverlayControls]);
+  }, [item.episode_id, clearHideControlsTimer]);
 
   useEffect(() => {
-    if (!showOttOverlayControls || !isActive) return undefined;
+    if (!isActive || isLocked || !streamUrl) return undefined;
     clearHideControlsTimer();
     if (!firstFrameReady || manuallyPaused || !controlsVisible) return undefined;
     hideControlsTimerRef.current = setTimeout(() => {
       setControlsVisible(false);
-    }, 2000);
+    }, hideControlsDelay);
     return clearHideControlsTimer;
   }, [
     controlsVisible,
+    controlsInteractionTick,
+    hideControlsDelay,
+    isLocked,
     manuallyPaused,
     firstFrameReady,
     isActive,
-    showOttOverlayControls,
+    streamUrl,
     clearHideControlsTimer,
   ]);
 
@@ -208,6 +234,27 @@ export default function ShortVideoReelItem({
     }
     togglePlayback();
   }, [showOttOverlayControls, isActive, isLocked, controlsVisible, togglePlayback]);
+
+  const handleNonOttVideoPress = useCallback(() => {
+    if (showOttOverlayControls || !isActive || isLocked) return;
+    setControlsVisible(true);
+    togglePlayback();
+  }, [showOttOverlayControls, isActive, isLocked, togglePlayback]);
+
+  const handlePlayPausePress = useCallback(() => {
+    setControlsVisible(true);
+    setManualPaused(!manuallyPaused);
+  }, [manuallyPaused, setManualPaused]);
+
+  const handleScrubStart = useCallback(() => {
+    clearHideControlsTimer();
+    setControlsVisible(true);
+  }, [clearHideControlsTimer]);
+
+  const handleScrubEnd = useCallback(() => {
+    setControlsVisible(true);
+    setControlsInteractionTick((tick) => tick + 1);
+  }, []);
 
   const handleOpenEpisodesOrReturn = useCallback(() => {
     if (onReturnToDramaSheet) {
@@ -285,14 +332,19 @@ export default function ShortVideoReelItem({
           </View>
         ) : (
           console.log(`🎬 NON-OTT MODE (showOttOverlayControls=false) - Episode: ${item.episode_num}, resizeMode: contain`),
-          <TouchableWithoutFeedback onPress={togglePlayback}>
-            <View style={StyleSheet.absoluteFill}>
+          <TouchableWithoutFeedback onPress={handleNonOttVideoPress}>
+            <View
+              style={[
+                styles.dramaVideoFrame,
+                { top: dramaVideoTop, height: dramaVideoHeight },
+              ]}
+            >
               <Video
                 key={item.episode_id}
                 ref={videoRef}
                 source={{ uri: streamUrl }}
                 style={[StyleSheet.absoluteFill, { opacity: firstFrameReady ? 1 : 0 }]}
-                resizeMode="contain"
+                resizeMode="cover"
                 paused={paused}
                 rate={playbackRate}
                 repeat={true}
@@ -313,9 +365,16 @@ export default function ShortVideoReelItem({
         )
       ) : null}
 
+      {!showOttOverlayControls && isActive && streamUrl && !isLocked && firstFrameReady ? (
+        <Pressable
+          style={styles.nonOttTapZone}
+          onPress={handleNonOttVideoPress}
+        />
+      ) : null}
+
       {/* Manual-pause overlay (non-OTT reels) */}
       {!showOttOverlayControls && isActive && manuallyPaused && !isLocked && firstFrameReady ? (
-        <TouchableWithoutFeedback onPress={togglePlayback}>
+        <TouchableWithoutFeedback onPress={handleNonOttVideoPress}>
           <View style={styles.pauseOverlay}>
             <View style={styles.pauseIconCircle}>
               <Ionicons name="play" size={40} color="#fff" />
@@ -342,22 +401,23 @@ export default function ShortVideoReelItem({
             ) : null}
           </View>
 
-          {(controlsVisible || manuallyPaused) ? (
-            <View style={styles.ottCenterWrap} pointerEvents="box-none">
-              <Pressable
-                style={styles.ottPlayPauseFab}
-                onPress={() => setManualPaused(!manuallyPaused)}
-                hitSlop={16}
-              >
-                <Ionicons
-                  name={manuallyPaused ? 'play' : 'pause'}
-                  size={44}
-                  color="#fff"
-                  style={manuallyPaused ? styles.playIconNudge : undefined}
-                />
-              </Pressable>
-            </View>
-          ) : null}
+          <Animated.View
+            style={[styles.ottCenterWrap, { opacity: controlsOpacity }]}
+            pointerEvents={showMainOverlay ? 'box-none' : 'none'}
+          >
+            <Pressable
+              style={styles.ottPlayPauseFab}
+              onPress={handlePlayPausePress}
+              hitSlop={16}
+            >
+              <Ionicons
+                name={manuallyPaused ? 'play' : 'pause'}
+                size={44}
+                color="#fff"
+                style={manuallyPaused ? styles.playIconNudge : undefined}
+              />
+            </Pressable>
+          </Animated.View>
         </View>
       ) : null}
 
@@ -425,7 +485,7 @@ export default function ShortVideoReelItem({
             <View style={styles.ottCenterWrap} pointerEvents="box-none">
               <Pressable
                 style={styles.ottPlayPauseFab}
-                onPress={() => setManualPaused(!manuallyPaused)}
+                onPress={handlePlayPausePress}
                 hitSlop={16}
               >
                 <Ionicons
@@ -438,18 +498,6 @@ export default function ShortVideoReelItem({
             </View>
           ) : null}
         </View>
-      ) : null}
-
-      {isActive && showPlaybackSpeedControl && streamUrl && !isLocked && firstFrameReady && !showOttOverlayControls ? (
-        <>
-          <Pressable
-            style={[styles.speedChip, { bottom: Math.max(insets.bottom, 12) + 56 }]}
-            onPress={() => setSpeedModalVisible(true)}
-            hitSlop={8}
-          >
-            <Text style={styles.speedChipText}>{playbackRate === 1 ? '1x' : `${playbackRate}x`}</Text>
-          </Pressable>
-        </>
       ) : null}
 
       {showPlaybackSpeedControl ? (
@@ -490,81 +538,94 @@ export default function ShortVideoReelItem({
           </Modal>
       ) : null}
 
-      <View
-        style={[
-          styles.uiOverlay,
-          { paddingBottom: itemHeight ? 10 : insets.bottom },
-        ]}
-        pointerEvents="box-none"
-      >
-        <View style={styles.sideActionsColumn}>
-          <SideAction
-            icon={isBookmarked ? 'bookmark' : 'bookmark-outline'}
-            label={item.view_count > 0 ? formatCount(item.view_count) : ''}
-            color={isBookmarked ? shortVideoTheme.crimson : '#fff'}
-            onPress={handleBookmarkPress}
-          />
-          <SideAction
-            icon="list"
-            label="Episodes"
-            onPress={handleOpenEpisodesOrReturn}
-          />
-          <SideAction icon="share-social" label="Share" onPress={handleShare} />
-        </View>
-
-        <View style={styles.textContent}>
-          <TouchableOpacity
-            style={styles.titleRow}
-            activeOpacity={0.8}
-            onPress={handleTitlePress}
-          >
-            <Text style={styles.reelTitle} numberOfLines={1}>{item.show_title}</Text>
-            <Ionicons name="chevron-forward" size={18} color="#fff" />
-          </TouchableOpacity>
-
-          <View style={styles.epBadge}>
-            <Ionicons name="videocam" size={12} color={shortVideoTheme.crimson} />
-            <Text style={styles.epBadgeText}>EP.{item.episode_num}</Text>
-          </View>
-
-          <View style={styles.tagsRow}>
-            {(item.tags || []).slice(0, 4).map((tag) => (
-              <View key={tag} style={styles.tagPill}>
-                <Text style={styles.tagText}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-
-          {item.synopsis ? (
-            <Text style={styles.descText} numberOfLines={2}>
-              {item.synopsis}{' '}
-              <Text style={{ fontWeight: 'bold', color: '#fff' }}>more</Text>
-            </Text>
-          ) : null}
-
-          {!isLocked && firstFrameReady ? (
-            <ProgressBar
-              currentTime={currentTime}
-              duration={duration}
-              onSeek={seekTo}
-              format={showOttOverlayControls ? 'elapsedTotal' : 'remaining'}
+      <Animated.View
+          style={[
+            styles.uiOverlay,
+            { paddingBottom: bottomControlsPadding },
+            { opacity: controlsOpacity },
+          ]}
+          pointerEvents={showMainOverlay ? 'box-none' : 'none'}
+        >
+          <View style={styles.sideActionsColumn}>
+            <SideAction
+              icon={isBookmarked ? 'bookmark' : 'bookmark-outline'}
+              label={item.view_count > 0 ? formatCount(item.view_count) : ''}
+              color={isBookmarked ? shortVideoTheme.crimson : '#fff'}
+              onPress={handleBookmarkPress}
             />
-          ) : null}
+            <SideAction
+              icon="list"
+              label="Episodes"
+              onPress={handleOpenEpisodesOrReturn}
+            />
+            <SideAction icon="share-social" label="Share" onPress={handleShare} />
+          </View>
 
-          <TouchableOpacity
-            style={styles.episodeStrip}
-            onPress={handleOpenEpisodesOrReturn}
-          >
-            <Ionicons name="play-circle" size={20} color={shortVideoTheme.crimson} />
-            <Text style={styles.episodeText}>
-              EP.{item.episode_num} / EP.{item.total_episodes}
-            </Text>
-            <View style={{ flex: 1 }} />
-            <Text style={styles.watchAllText}>Watch All</Text>
-            <Ionicons name="chevron-forward" size={16} color={shortVideoTheme.muted} />
-          </TouchableOpacity>
-        </View>
-      </View>
+          <View style={styles.textContent}>
+            <TouchableOpacity
+              style={styles.titleRow}
+              activeOpacity={0.8}
+              onPress={handleTitlePress}
+            >
+              <Text style={styles.reelTitle} numberOfLines={1}>{item.show_title}</Text>
+              <Ionicons name="chevron-forward" size={18} color="#fff" />
+            </TouchableOpacity>
+
+            <View style={styles.epBadge}>
+              <Ionicons name="videocam" size={12} color={shortVideoTheme.crimson} />
+              <Text style={styles.epBadgeText}>EP.{item.episode_num}</Text>
+            </View>
+
+            <View style={styles.tagsRow}>
+              {(item.tags || []).slice(0, 4).map((tag) => (
+                <View key={tag} style={styles.tagPill}>
+                  <Text style={styles.tagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+
+            {item.synopsis ? (
+              <Text style={styles.descText} numberOfLines={2}>
+                {item.synopsis}{' '}
+                <Text style={{ fontWeight: 'bold', color: '#fff' }}>more</Text>
+              </Text>
+            ) : null}
+
+            {!isLocked && firstFrameReady ? (
+              <ProgressBar
+                currentTime={currentTime}
+                duration={duration}
+                onSeek={seekTo}
+                format={showOttOverlayControls ? 'elapsedTotal' : 'remaining'}
+                onScrubStart={handleScrubStart}
+                onScrubEnd={handleScrubEnd}
+              />
+            ) : null}
+
+            {showEpisodeStrip ? (
+              <TouchableOpacity
+                style={styles.episodeStrip}
+                onPress={handleOpenEpisodesOrReturn}
+              >
+                <Ionicons
+                  name="play-circle"
+                  size={20}
+                  color={shortVideoTheme.crimson}
+                />
+                <Text style={styles.episodeText}>
+                  EP.{item.episode_num} / EP.{item.total_episodes}
+                </Text>
+                <View style={{ flex: 1 }} />
+                <Text style={styles.watchAllText}>Watch All</Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={shortVideoTheme.muted}
+                />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+      </Animated.View>
 
       {topOverlay}
     </View>

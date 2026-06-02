@@ -22,6 +22,8 @@ export default function useShortVideoPlayback({
   const lastTapAtRef = useRef(0);
   const videoRef = useRef(null);
   const lastProgressUpdateRef = useRef(0); // tracks last progress_sec we reported
+  const pendingSeekRef = useRef(null);
+  const currentTimeRef = useRef(0);
 
   const [firstFrameReady, setFirstFrameReady] = useState(false);
   const [manuallyPaused, setManuallyPaused] = useState(false);
@@ -34,9 +36,11 @@ export default function useShortVideoPlayback({
   useEffect(() => {
     setFirstFrameReady(false);
     setCurrentTime(0);
+    currentTimeRef.current = 0;
     setManuallyPaused(false);
     setDuration(initialDuration);
     lastProgressUpdateRef.current = 0; // reset progress tracker on item change
+    pendingSeekRef.current = null;
   }, [initialDuration, itemKey]);
 
   const onLoad = useCallback((data) => {
@@ -47,7 +51,33 @@ export default function useShortVideoPlayback({
   }, [itemKey]);
 
   const onProgress = useCallback((data) => {
-    setCurrentTime(data.currentTime);
+    const nextTime = data.currentTime || 0;
+    const pendingSeek = pendingSeekRef.current;
+    if (pendingSeek) {
+      const elapsedMs = Date.now() - pendingSeek.startedAt;
+      const seekingForward = pendingSeek.time >= pendingSeek.previousTime;
+      const reachedTarget = seekingForward
+        ? nextTime >= pendingSeek.time - 0.75
+        : nextTime <= pendingSeek.time + 0.75;
+
+      if (!reachedTarget && elapsedMs < 3000) {
+        return;
+      }
+
+      pendingSeekRef.current = null;
+    }
+
+    const knownDuration = data.seekableDuration || duration;
+    const previousTime = currentTimeRef.current;
+    const loopedToStart = knownDuration > 0 && previousTime > knownDuration - 1 && nextTime < 1.5;
+    const tinyBackwardJitter = nextTime + 0.35 < previousTime;
+
+    if (tinyBackwardJitter && !loopedToStart) {
+      return;
+    }
+
+    currentTimeRef.current = nextTime;
+    setCurrentTime(nextTime);
 
     if (duration === 0 && data.seekableDuration > 0) {
       setDuration(data.seekableDuration);
@@ -91,7 +121,13 @@ export default function useShortVideoPlayback({
 
   const seekTo = useCallback((time) => {
     if (!videoRef.current) return;
+    pendingSeekRef.current = {
+      time,
+      previousTime: currentTimeRef.current,
+      startedAt: Date.now(),
+    };
     videoRef.current.seek(time);
+    currentTimeRef.current = time;
     setCurrentTime(time);
   }, []);
 

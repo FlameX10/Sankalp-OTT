@@ -7,43 +7,82 @@ import { formatTime } from './utils';
 
 const DEFAULT_TRACK_WIDTH = SCREEN_WIDTH - 32;
 
-export default function ProgressBar({ currentTime, duration, onSeek, format = 'remaining' }) {
+export default function ProgressBar({
+  currentTime,
+  duration,
+  onSeek,
+  format = 'remaining',
+  onScrubStart,
+  onScrubEnd,
+}) {
+  const hitAreaRef = useRef(null);
   const trackWidthRef = useRef(DEFAULT_TRACK_WIDTH);
+  const trackLeftRef = useRef(0);
+  const durationRef = useRef(duration);
+  const onSeekRef = useRef(onSeek);
+  const onScrubStartRef = useRef(onScrubStart);
+  const onScrubEndRef = useRef(onScrubEnd);
+  const activePageXRef = useRef(0);
   const [scrubbing, setScrubbing] = useState(false);
   const [scrubTime, setScrubTime] = useState(0);
 
-  const displayTime = scrubbing ? scrubTime : currentTime;
-  const progress = duration > 0 ? displayTime / duration : 0;
-  const remaining = duration - displayTime;
+  durationRef.current = duration;
+  onSeekRef.current = onSeek;
+  onScrubStartRef.current = onScrubStart;
+  onScrubEndRef.current = onScrubEnd;
 
-  const seekFromLocationX = useCallback(
-    (locationX) => {
+  const rawDisplayTime = scrubbing ? scrubTime : currentTime;
+  const displayTime = duration > 0
+    ? Math.max(0, Math.min(rawDisplayTime, duration))
+    : Math.max(0, rawDisplayTime);
+  const progress = duration > 0 ? Math.max(0, Math.min(displayTime / duration, 1)) : 0;
+  const remaining = Math.max(0, duration - displayTime);
+
+  const measureTrack = useCallback(() => {
+    hitAreaRef.current?.measureInWindow((x, _y, width) => {
+      if (width > 0) {
+        trackLeftRef.current = x;
+        trackWidthRef.current = width;
+      }
+    });
+  }, []);
+
+  const seekFromPageX = useCallback(
+    (pageX) => {
       const w = trackWidthRef.current || DEFAULT_TRACK_WIDTH;
-      const ratio = Math.max(0, Math.min(1, locationX / w));
-      return ratio * duration;
+      const ratio = Math.max(0, Math.min(1, (pageX - trackLeftRef.current) / w));
+      return ratio * durationRef.current;
     },
-    [duration]
+    []
   );
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => duration > 0,
-      onMoveShouldSetPanResponder: () => duration > 0,
+      onStartShouldSetPanResponder: () => durationRef.current > 0,
+      onMoveShouldSetPanResponder: () => durationRef.current > 0,
       onPanResponderGrant: (evt) => {
-        const t = seekFromLocationX(evt.nativeEvent.locationX);
+        measureTrack();
+        activePageXRef.current = evt.nativeEvent.pageX;
+        const t = seekFromPageX(activePageXRef.current);
         setScrubbing(true);
         setScrubTime(t);
+        onScrubStartRef.current?.();
       },
-      onPanResponderMove: (evt) => {
-        setScrubTime(seekFromLocationX(evt.nativeEvent.locationX));
+      onPanResponderMove: (_evt, gestureState) => {
+        const pageX = gestureState.moveX || activePageXRef.current + gestureState.dx;
+        activePageXRef.current = pageX;
+        setScrubTime(seekFromPageX(pageX));
       },
-      onPanResponderRelease: (evt) => {
-        const t = seekFromLocationX(evt.nativeEvent.locationX);
+      onPanResponderRelease: (_evt, gestureState) => {
+        const pageX = gestureState.moveX || activePageXRef.current;
+        const t = seekFromPageX(pageX);
         setScrubbing(false);
-        onSeek?.(t);
+        onScrubEndRef.current?.();
+        onSeekRef.current?.(t);
       },
       onPanResponderTerminate: () => {
         setScrubbing(false);
+        onScrubEndRef.current?.();
       },
     })
   ).current;
@@ -51,10 +90,12 @@ export default function ProgressBar({ currentTime, duration, onSeek, format = 'r
   return (
     <View style={styles.progressContainer}>
       <View
+        ref={hitAreaRef}
         style={styles.progressBarHitArea}
         onLayout={(e) => {
           const w = e.nativeEvent.layout.width;
           if (w > 0) trackWidthRef.current = w;
+          measureTrack();
         }}
         {...panResponder.panHandlers}
       >

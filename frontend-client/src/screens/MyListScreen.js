@@ -369,7 +369,7 @@ export default function MyListScreen() {
         episode_num: watchEntry.episode_num,
         duration_sec: watchEntry.duration_sec,
         progress_sec: watchEntry.progress_sec,
-        total_episodes: bookmark.total_episodes,
+        total_episodes: watchEntry.total_episodes ?? bookmark.total_episodes,
       };
     }
 

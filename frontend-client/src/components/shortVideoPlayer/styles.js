@@ -128,6 +128,14 @@ export const styles = StyleSheet.create({
   },
   topSearch: { position: 'absolute', right: 20, padding: 10 },
 
+  dramaVideoFrame: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+  },
+
   pauseOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
@@ -258,6 +266,10 @@ export const styles = StyleSheet.create({
   ottTapZone: {
     position: 'absolute',
     zIndex: 1,
+  },
+  nonOttTapZone: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
   },
   ottDim: {
     ...StyleSheet.absoluteFillObject,

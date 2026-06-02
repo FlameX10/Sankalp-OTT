@@ -176,6 +176,16 @@ router.get('/bookmarks', requireAuth, async (req, res, next) => {
       },
     });
 
+    const showIds = [...new Set(bookmarks.map((b) => b.show_id).filter(Boolean))];
+    const totalEpisodesByShowId = {};
+    await Promise.all(
+      showIds.map(async (sid) => {
+        totalEpisodesByShowId[sid] = await prisma.episode.count({
+          where: { show_id: sid },
+        });
+      })
+    );
+
     const items = bookmarks.map(b => ({
       bookmark_id: b.id,
       show_id: b.show_id,
@@ -187,6 +197,7 @@ router.get('/bookmarks', requireAuth, async (req, res, next) => {
       episode_title: b.episode?.title || null,
       duration_sec: b.episode?.duration_sec || 0,
       progress_sec: b.progress_sec,
+      total_episodes: totalEpisodesByShowId[b.show_id] ?? null,
       created_at: b.created_at,
     }));
 
@@ -300,6 +311,18 @@ router.get('/watch-history', requireAuth, async (req, res, next) => {
       if (deduplicated.length >= 20) break;
     }
 
+    const dedupShowIds = [
+      ...new Set(deduplicated.map((h) => h.episode?.show?.id).filter(Boolean)),
+    ];
+    const totalEpisodesByShowId = {};
+    await Promise.all(
+      dedupShowIds.map(async (sid) => {
+        totalEpisodesByShowId[sid] = await prisma.episode.count({
+          where: { show_id: sid },
+        });
+      })
+    );
+
     const items = deduplicated.map(h => ({
       history_id: h.id,
       show_id: h.episode?.show?.id || null,
@@ -311,6 +334,7 @@ router.get('/watch-history', requireAuth, async (req, res, next) => {
       episode_title: h.episode?.title || null,
       duration_sec: h.episode?.duration_sec || 0,
       progress_sec: h.progress_sec,
+      total_episodes: totalEpisodesByShowId[h.episode?.show?.id] ?? null,
       last_watched: h.last_watched,
     }));
 

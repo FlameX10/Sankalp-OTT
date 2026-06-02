@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import { randomUUID } from 'crypto';
 import { prisma } from '../prisma/client.js';
 import logger from '../config/logger.js';
 
@@ -97,7 +98,7 @@ export async function processExpiredMemberships() {
 
         // Step 6: Log activity for each downgraded user (audit trail)
         const activityLogs = usersToDowngrade.map(userId => ({
-          id: crypto.randomUUID ? crypto.randomUUID() : undefined,
+          id: randomUUID(),
           user_id: userId,
           action: 'MEMBERSHIP_EXPIRED',
           entity_type: 'MEMBERSHIP',

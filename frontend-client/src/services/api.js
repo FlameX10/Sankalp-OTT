@@ -120,6 +120,16 @@ const refreshApi = axios.create({
   },
 });
 
+function isAuthEndpoint(url = '') {
+  return url.includes('/auth/login') ||
+    url.includes('/auth/register') ||
+    url.includes('/auth/verify-otp') ||
+    url.includes('/auth/forgot-password') ||
+    url.includes('/auth/reset-password') ||
+    url.includes('/auth/resend-otp') ||
+    url.includes('/auth/resend-forgot-otp');
+}
+
 api.interceptors.response.use(
   (response) => {
     return response;
@@ -129,6 +139,10 @@ api.interceptors.response.use(
 
     // Only try to refresh on 401
     if (error.response?.status !== 401) {
+      return Promise.reject(error);
+    }
+
+    if (isAuthEndpoint(originalRequest?.url)) {
       return Promise.reject(error);
     }
 
@@ -200,7 +214,7 @@ api.interceptors.response.use(
       // Retry original request
       return api(originalRequest);
     } catch (refreshError) {
-      console.error('[API Interceptor] Token refresh failed:', refreshError);
+      console.log('[API Interceptor] Token refresh skipped:', refreshError?.message);
 
       // Logout user on refresh failure
       if (store) {

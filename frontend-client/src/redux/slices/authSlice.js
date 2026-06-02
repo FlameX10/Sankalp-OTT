@@ -88,11 +88,14 @@ export const loginUser = createAsyncThunk(
       };
 
     } catch (err) {
-      const message =
+      const rawMessage =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
         err?.message ||
         'Login failed';
+      const message = err?.response?.status === 401
+        ? 'Incorrect email or password. Please try again.'
+        : rawMessage;
 
       return rejectWithValue(message);
     }
@@ -315,9 +318,9 @@ export const initAuth = createAsyncThunk(
         pendingPasswordReset,
       };
     } catch (err) {
-      console.error('[initAuth] Restore failed:', err?.message);
+      console.log('[initAuth] Restore skipped:', err?.message);
       // Silently fail - user will see login screen
-      return rejectWithValue('Session restore failed');
+      return null;
     }
   }
 );

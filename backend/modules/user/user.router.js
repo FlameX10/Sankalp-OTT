@@ -413,6 +413,19 @@ router.post('/wallet/simulate-purchase', requireAuth, async (req, res, next) => 
         data: { coins: nextCoins },
       });
 
+      // Create a PaymentTransaction record first (simulated for now, real gateway later)
+      const payment = await tx.paymentTransaction.create({
+        data: {
+          user_id: userId,
+          type: 'topup',
+          amount: parseFloat(plan.price),
+          currency: plan.currency,
+          gateway: 'simulated',
+          status: 'completed',
+        },
+      });
+
+      // Create CoinTransaction linked to the PaymentTransaction
       const row = await tx.coinTransaction.create({
         data: {
           user_id: userId,
@@ -420,14 +433,15 @@ router.post('/wallet/simulate-purchase', requireAuth, async (req, res, next) => 
           amount: coinsToAdd,
           reason: 'wallet_topup_simulated',
           ref_id: plan.id,
+          payment_id: payment.id,
           title: 'Coin top-up',
           description: `${plan.name} - ₹${parseFloat(plan.price).toFixed(2)} → ${coinsToAdd} coins`,
-          fiat_paise: Math.round(parseFloat(plan.price) * 100),
+          fiat_paise: parseFloat(plan.price),
           status: 'completed',
         },
       });
 
-      return { coins: nextCoins, transaction_id: row.id };
+      return { coins: nextCoins, transaction_id: row.id, payment_id: payment.id };
     });
 
     if (!result) {

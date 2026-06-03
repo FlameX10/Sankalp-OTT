@@ -166,6 +166,7 @@ model PaymentTransaction {
 
   user        User             @relation(fields: [user_id], references: [id])
   memberships UserMembership[]
+  coin_topups CoinTransaction[]
 
   @@map("payment_transactions")
 }
@@ -322,10 +323,12 @@ model CoinTransaction {
   title       String?  @db.VarChar(120)
   description String?  @db.VarChar(255)
   fiat_paise  Int?
+  payment_id  String?  @db.Uuid
   status      String   @default("completed") @db.VarChar(20)
   created_at  DateTime @default(now())
 
-  user User @relation(fields: [user_id], references: [id])
+  user                User                 @relation(fields: [user_id], references: [id])
+  payment_transaction PaymentTransaction?  @relation(fields: [payment_id], references: [id])
 
   @@index([user_id, created_at(sort: Desc)], name: "idx_ct_user_created")
   @@map("coin_transactions")

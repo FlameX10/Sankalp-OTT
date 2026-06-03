@@ -628,18 +628,26 @@ function getDateRange(periodType) {
   let prevStartDate = new Date();
   let prevEndDate = new Date();
 
-  if (periodType === 'Daily') {
+  if (periodType === 'All') {
+    startDate = new Date(0); // epoch — fetches all-time data
+    prevStartDate = new Date(0);
+    prevEndDate = new Date(0);
+  } else if (periodType === 'Daily') {
     startDate.setHours(0, 0, 0, 0);
     prevStartDate.setDate(prevStartDate.getDate() - 1);
     prevStartDate.setHours(0, 0, 0, 0);
     prevEndDate.setDate(prevEndDate.getDate() - 1);
     prevEndDate.setHours(23, 59, 59, 999);
   } else if (periodType === 'Weekly') {
-    startDate.setDate(startDate.getDate() - startDate.getDay());
+    // Start from Monday of the current week
+    const day = startDate.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    startDate.setDate(startDate.getDate() + diffToMonday);
     startDate.setHours(0, 0, 0, 0);
-    prevStartDate.setDate(prevStartDate.getDate() - prevStartDate.getDay() - 7);
+    // Previous week: Monday to Sunday
+    prevStartDate.setDate(prevStartDate.getDate() + diffToMonday - 7);
     prevStartDate.setHours(0, 0, 0, 0);
-    prevEndDate.setDate(prevEndDate.getDate() - prevEndDate.getDay() - 1);
+    prevEndDate.setDate(prevEndDate.getDate() + diffToMonday - 1);
     prevEndDate.setHours(23, 59, 59, 999);
   } else if (periodType === 'Monthly') {
     startDate.setDate(1);
@@ -680,9 +688,7 @@ function formatNumber(num) {
 function formatCurrency(num) {
   if (!num) return '₹0';
   const val = parseFloat(num);
-  if (val >= 1000000) return '₹' + (val / 1000000).toFixed(1) + 'M';
-  if (val >= 1000) return '₹' + (val / 1000).toFixed(1) + 'K';
-  return '₹' + val.toFixed(0);
+  return '₹' + val.toLocaleString('en-IN');
 }
 
 /**
@@ -710,10 +716,22 @@ export async function getDashboardMetrics(req, res, next) {
       where: { status: 'ACTIVE' },
     });
 
-    // Revenue from payments in period
+    // Total revenue from all payments in period
     const revenue = await prisma.paymentTransaction.aggregate({
       _sum: { amount: true },
       where: { created_at: { gte: periodStart }, status: 'completed' },
+    });
+
+    // Membership revenue (type = 'membership')
+    const membershipRevenue = await prisma.paymentTransaction.aggregate({
+      _sum: { amount: true },
+      where: { created_at: { gte: periodStart }, status: 'completed', type: 'membership' },
+    });
+
+    // Top-up revenue (type = 'topup')
+    const topupRevenue = await prisma.paymentTransaction.aggregate({
+      _sum: { amount: true },
+      where: { created_at: { gte: periodStart }, status: 'completed', type: 'topup' },
     });
 
     // Dramas uploaded
@@ -737,6 +755,7 @@ export async function getDashboardMetrics(req, res, next) {
     });
 
     // Calculate trends (compare current period with previous period)
+    // For 'All', trends are not applicable
     const previousPeriodStart = new Date(periodStart);
     if (period === 'Daily') {
       previousPeriodStart.setDate(previousPeriodStart.getDate() - 1);
@@ -748,39 +767,92 @@ export async function getDashboardMetrics(req, res, next) {
       previousPeriodStart.setFullYear(previousPeriodStart.getFullYear() - 1);
     }
 
-    const previousRevenue = await prisma.paymentTransaction.aggregate({
-      _sum: { amount: true },
-      where: {
-        created_at: { gte: previousPeriodStart, lt: periodStart },
-        status: 'completed',
-      },
-    });
+    let prevRevenue = 0, prevMembershipRevenue = 0, prevTopupRevenue = 0;
 
-    const prevRevenue = previousRevenue._sum.amount || 0;
+    if (period !== 'All') {
+      const previousMembershipRevenueResult = await prisma.paymentTransaction.aggregate({
+        _sum: { amount: true },
+        where: {
+          created_at: { gte: previousPeriodStart, lt: periodStart },
+          status: 'completed',
+          type: 'membership',
+        },
+      });
+
+      const previousTopupRevenueResult = await prisma.paymentTransaction.aggregate({
+        _sum: { amount: true },
+        where: {
+          created_at: { gte: previousPeriodStart, lt: periodStart },
+          status: 'completed',
+          type: 'topup',
+        },
+      });
+
+      const previousRevenueResult = await prisma.paymentTransaction.aggregate({
+        _sum: { amount: true },
+        where: {
+          created_at: { gte: previousPeriodStart, lt: periodStart },
+          status: 'completed',
+        },
+      });
+
+      prevRevenue = previousRevenueResult._sum.amount || 0;
+      prevMembershipRevenue = previousMembershipRevenueResult._sum.amount || 0;
+      prevTopupRevenue = previousTopupRevenueResult._sum.amount || 0;
+    }
+
     const currRevenue = revenue._sum.amount || 0;
-    const revenueTrend = prevRevenue > 0 ? (((currRevenue - prevRevenue) / prevRevenue) * 100).toFixed(1) : 0;
+    const revenueTrend = prevRevenue > 0 ? (((currRevenue - prevRevenue) / prevRevenue) * 100).toFixed(1) : null;
+
+    const currMembershipRevenue = membershipRevenue._sum.amount || 0;
+    const membershipRevenueTrend = prevMembershipRevenue > 0
+      ? (((currMembershipRevenue - prevMembershipRevenue) / prevMembershipRevenue) * 100).toFixed(1)
+      : null;
+
+    const currTopupRevenue = topupRevenue._sum.amount || 0;
+    const topupRevenueTrend = prevTopupRevenue > 0
+      ? (((currTopupRevenue - prevTopupRevenue) / prevTopupRevenue) * 100).toFixed(1)
+      : null;
+
+    const periodLabel = period === 'All' ? 'all time' : period.toLowerCase();
 
     const metrics = [
+      // Row 1 — Revenue cards
+      {
+        label: 'Total Revenue',
+        value: formatCurrency(currRevenue),
+        sub: periodLabel,
+        trend: revenueTrend !== null ? (revenueTrend > 0 ? `+${revenueTrend}%` : `${revenueTrend}%`) : null,
+        up: revenueTrend !== null ? revenueTrend > 0 : null,
+      },
+      {
+        label: 'Membership Revenue',
+        value: formatCurrency(currMembershipRevenue),
+        sub: `memberships ${periodLabel}`,
+        trend: membershipRevenueTrend !== null ? (membershipRevenueTrend > 0 ? `+${membershipRevenueTrend}%` : `${membershipRevenueTrend}%`) : null,
+        up: membershipRevenueTrend !== null ? membershipRevenueTrend > 0 : null,
+      },
+      {
+        label: 'Top-Up Revenue',
+        value: formatCurrency(currTopupRevenue),
+        sub: `top-ups ${periodLabel}`,
+        trend: topupRevenueTrend !== null ? (topupRevenueTrend > 0 ? `+${topupRevenueTrend}%` : `${topupRevenueTrend}%`) : null,
+        up: topupRevenueTrend !== null ? topupRevenueTrend > 0 : null,
+      },
+      // Row 2+ — Remaining cards
       {
         label: 'Total Users',
         value: formatNumber(totalUsers),
         sub: 'registered users',
-        trend: '+2.1%',
-        up: true,
+        trend: period !== 'All' ? '+2.1%' : null,
+        up: period !== 'All' ? true : null,
       },
       {
         label: 'Active Subscriptions',
         value: formatNumber(activeSubscriptions),
         sub: 'current memberships',
-        trend: '+1.5%',
-        up: true,
-      },
-      {
-        label: 'Revenue',
-        value: formatCurrency(currRevenue),
-        sub: period.toLowerCase(),
-        trend: revenueTrend > 0 ? `+${revenueTrend}%` : `${revenueTrend}%`,
-        up: revenueTrend > 0,
+        trend: period !== 'All' ? '+1.5%' : null,
+        up: period !== 'All' ? true : null,
       },
       {
         label: 'Dramas Uploaded',
@@ -792,23 +864,23 @@ export async function getDashboardMetrics(req, res, next) {
       {
         label: 'Coins Earned',
         value: formatCoins(coinsEarned._sum.amount || 0),
-        sub: `issued ${period.toLowerCase()}`,
-        trend: '+5%',
-        up: true,
+        sub: `issued ${periodLabel}`,
+        trend: period !== 'All' ? '+5%' : null,
+        up: period !== 'All' ? true : null,
       },
       {
         label: 'Coins Spent',
         value: formatCoins(coinsSpent._sum.coins_spent || 0),
-        sub: `unlocked ${period.toLowerCase()}`,
-        trend: '+3%',
-        up: true,
+        sub: `unlocked ${periodLabel}`,
+        trend: period !== 'All' ? '+3%' : null,
+        up: period !== 'All' ? true : null,
       },
       {
         label: 'Check-ins',
         value: formatNumber(checkinsCount),
         sub: `daily rewards claimed`,
-        trend: '+8%',
-        up: true,
+        trend: period !== 'All' ? '+8%' : null,
+        up: period !== 'All' ? true : null,
       },
     ];
 
@@ -1002,6 +1074,128 @@ export async function getAnalyticsReport(req, res, next) {
 
     return res.json(
       new ApiResponse(200, { reportData, reportType, period: periodType }, 'Report data fetched successfully')
+    );
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * GET /api/v1/admin/dashboard/revenue-chart?period=Daily|Weekly|Monthly|Annual|All
+ * Returns day-by-day revenue (total, membership, topup) for the selected period
+ */
+export async function getRevenueChart(req, res, next) {
+  try {
+    const { period = 'Daily' } = req.query;
+    const { startDate, endDate } = getDateRange(period);
+
+    // Fetch all completed payment transactions in range
+    const transactions = await prisma.paymentTransaction.findMany({
+      where: {
+        created_at: { gte: startDate, lte: endDate },
+        status: 'completed',
+      },
+      select: { created_at: true, amount: true, type: true },
+      orderBy: { created_at: 'asc' },
+    });
+
+    // Build a map of date -> { total, membership, topup }
+    const dayMap = {};
+
+    // Pre-populate every day in range so chart has no gaps
+    const cursor = new Date(startDate);
+    cursor.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    while (cursor <= end) {
+      const key = cursor.toISOString().split('T')[0]; // YYYY-MM-DD
+      dayMap[key] = { date: key, total: 0, membership: 0, topup: 0 };
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    // Accumulate
+    for (const tx of transactions) {
+      const key = new Date(tx.created_at).toISOString().split('T')[0];
+      if (!dayMap[key]) continue;
+      const amt = parseFloat(tx.amount) || 0;
+      dayMap[key].total += amt;
+      if (tx.type === 'membership') dayMap[key].membership += amt;
+      else if (tx.type === 'topup') dayMap[key].topup += amt;
+    }
+
+    const chartData = Object.values(dayMap).map(d => ({
+      date: d.date,
+      total: parseFloat(d.total.toFixed(2)),
+      membership: parseFloat(d.membership.toFixed(2)),
+      topup: parseFloat(d.topup.toFixed(2)),
+    }));
+
+    return res.json(
+      new ApiResponse(200, { chartData, period }, 'Revenue chart data fetched successfully')
+    );
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * GET /api/v1/admin/dashboard/top-shows?period=Daily|Weekly|Monthly|Annual|All
+ * Returns top 5 shows by episode unlocks in the selected period
+ */
+export async function getTopShowsChart(req, res, next) {
+  try {
+    const { period = 'Daily' } = req.query;
+    const { startDate, endDate } = getDateRange(period);
+
+    // Group episode unlocks by episode, count them
+    const topEpisodes = await prisma.episodeAccess.groupBy({
+      by: ['episode_id'],
+      where: { unlocked_at: { gte: startDate, lte: endDate } },
+      _count: { episode_id: true },
+      _sum: { coins_spent: true },
+      orderBy: { _count: { episode_id: 'desc' } },
+      take: 20, // fetch more than 5 to account for grouping by show
+    });
+
+    if (topEpisodes.length === 0) {
+      return res.json(new ApiResponse(200, { chartData: [], period }, 'No data'));
+    }
+
+    // Fetch episode -> show mapping
+    const episodeIds = topEpisodes.map(e => e.episode_id);
+    const episodes = await prisma.episode.findMany({
+      where: { id: { in: episodeIds } },
+      select: { id: true, show_id: true, show: { select: { id: true, title: true } } },
+    });
+
+    const episodeShowMap = {};
+    for (const ep of episodes) {
+      episodeShowMap[ep.id] = { showId: ep.show_id, showTitle: ep.show?.title || 'Unknown' };
+    }
+
+    // Aggregate by show
+    const showMap = {};
+    for (const ep of topEpisodes) {
+      const info = episodeShowMap[ep.episode_id];
+      if (!info) continue;
+      if (!showMap[info.showId]) {
+        showMap[info.showId] = { showId: info.showId, show: info.showTitle, unlocks: 0, coinsSpent: 0 };
+      }
+      showMap[info.showId].unlocks += ep._count.episode_id;
+      showMap[info.showId].coinsSpent += ep._sum.coins_spent || 0;
+    }
+
+    const chartData = Object.values(showMap)
+      .sort((a, b) => b.unlocks - a.unlocks)
+      .slice(0, 5)
+      .map(s => ({
+        show: s.show,
+        unlocks: s.unlocks,
+        coinsSpent: s.coinsSpent,
+      }));
+
+    return res.json(
+      new ApiResponse(200, { chartData, period }, 'Top shows chart data fetched successfully')
     );
   } catch (error) {
     next(error);

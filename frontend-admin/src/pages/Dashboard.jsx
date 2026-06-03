@@ -1,21 +1,67 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, TrendingDown, Users, Film, DollarSign, Coins, AlertTriangle, CreditCard } from 'lucide-react'
+import { TrendingUp, TrendingDown, Users, Film, DollarSign, Coins, AlertTriangle, CreditCard, Wallet } from 'lucide-react'
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts'
 import api from '../services/api'
 
-const PERIODS = ['Daily', 'Weekly', 'Monthly', 'Annual']
+const PERIODS = ['Daily', 'Weekly', 'Monthly', 'Annual', 'All']
 
-const metricIcons = [Users, CreditCard, DollarSign, Film, Coins, Coins, AlertTriangle]
+// 9 cards: Total Revenue, Membership Revenue, Top-Up Revenue, Total Users, Active Subscriptions, Dramas Uploaded, Coins Earned, Coins Spent, Check-ins
+const metricIcons = [DollarSign, CreditCard, Wallet, Users, CreditCard, Film, Coins, Coins, AlertTriangle]
 
 const alerts = []
 
+// Format date label for X axis
+function formatDateLabel(dateStr) {
+  const d = new Date(dateStr)
+  return `${d.getDate()}/${d.getMonth() + 1}`
+}
+
+// Custom tooltip for revenue chart
+function RevenueTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 12 }}>
+      <div style={{ color: 'var(--text2)', marginBottom: 4 }}>{label}</div>
+      {payload.map(p => (
+        <div key={p.dataKey} style={{ color: p.color, display: 'flex', gap: 8, justifyContent: 'space-between' }}>
+          <span>{p.name}</span>
+          <span style={{ fontFamily: 'var(--mono)' }}>₹{Number(p.value).toLocaleString('en-IN')}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Custom tooltip for top shows chart
+function ShowsTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 12 }}>
+      <div style={{ color: 'var(--text2)', marginBottom: 4 }}>{label}</div>
+      {payload.map(p => (
+        <div key={p.dataKey} style={{ color: p.color, display: 'flex', gap: 8, justifyContent: 'space-between' }}>
+          <span>{p.name}</span>
+          <span style={{ fontFamily: 'var(--mono)' }}>{p.value}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function Dashboard() {
-  const [period, setPeriod] = useState('Monthly')
+  const [period, setPeriod] = useState('Daily')
   const [metrics, setMetrics] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [revenueChart, setRevenueChart] = useState([])
+  const [topShows, setTopShows] = useState([])
+  const [chartsLoading, setChartsLoading] = useState(true)
 
   useEffect(() => {
     fetchMetrics(period)
+    fetchCharts(period)
   }, [period])
 
   async function fetchMetrics(selectedPeriod) {
@@ -29,6 +75,23 @@ export default function Dashboard() {
       setMetrics([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchCharts(selectedPeriod) {
+    setChartsLoading(true)
+    try {
+      const [revRes, showsRes] = await Promise.all([
+        api.get(`/v1/admin/dashboard/revenue-chart?period=${selectedPeriod}`),
+        api.get(`/v1/admin/dashboard/top-shows?period=${selectedPeriod}`),
+      ])
+      setRevenueChart(revRes.data.data?.chartData || [])
+      setTopShows(showsRes.data.data?.chartData || [])
+    } catch (err) {
+      setRevenueChart([])
+      setTopShows([])
+    } finally {
+      setChartsLoading(false)
     }
   }
 
@@ -106,6 +169,81 @@ export default function Dashboard() {
       {!loading && metrics.length === 0 && !error && (
         <div style={{ padding:'40px', textAlign:'center', color:'var(--text3)' }}>
           No metrics available for this period
+        </div>
+      )}
+
+      {/* Charts row */}
+      {!loading && (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:8 }}>
+
+          {/* Revenue over time */}
+          <div className="metric-card" style={{ padding:'16px 18px' }}>
+            <div style={{ fontWeight:600, fontSize:13, marginBottom:16, color:'var(--text)' }}>Revenue over time</div>
+            {chartsLoading ? (
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:220, color:'var(--text3)', fontSize:12 }}>Loading...</div>
+            ) : revenueChart.length === 0 ? (
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:220, color:'var(--text3)', fontSize:12 }}>No data for this period</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={revenueChart} margin={{ top:4, right:8, left:0, bottom:0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={formatDateLabel}
+                    tick={{ fontSize:10, fill:'var(--text3)' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize:10, fill:'var(--text3)' }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={v => v >= 1000 ? `₹${(v/1000).toFixed(0)}k` : `₹${v}`}
+                    width={45}
+                  />
+                  <Tooltip content={<RevenueTooltip />} />
+                  <Legend wrapperStyle={{ fontSize:11, paddingTop:8 }} />
+                  <Line type="monotone" dataKey="total" name="Total" stroke="var(--accent)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="membership" name="Membership" stroke="var(--green)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="topup" name="Top-Up" stroke="var(--blue)" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* Top 5 shows by unlocks */}
+          <div className="metric-card" style={{ padding:'16px 18px' }}>
+            <div style={{ fontWeight:600, fontSize:13, marginBottom:16, color:'var(--text)' }}>Top shows by unlocks</div>
+            {chartsLoading ? (
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:220, color:'var(--text3)', fontSize:12 }}>Loading...</div>
+            ) : topShows.length === 0 ? (
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:220, color:'var(--text3)', fontSize:12 }}>No data for this period</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={topShows} layout="vertical" margin={{ top:4, right:8, left:0, bottom:0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize:10, fill:'var(--text3)' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="show"
+                    tick={{ fontSize:10, fill:'var(--text3)' }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={90}
+                    tickFormatter={v => v.length > 12 ? v.slice(0, 12) + '…' : v}
+                  />
+                  <Tooltip content={<ShowsTooltip />} />
+                  <Bar dataKey="unlocks" name="Unlocks" fill="var(--accent)" radius={[0, 3, 3, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
         </div>
       )}
     </div>

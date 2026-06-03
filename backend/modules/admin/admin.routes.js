@@ -15,6 +15,8 @@ import {
   updateBanner,
   deleteBanner,
   getDashboardMetrics,
+  getRevenueChart,
+  getTopShowsChart,
   getAnalyticsReport,
 } from './admin.controller.js';
 import {
@@ -40,6 +42,8 @@ router.get('/activity-logs', requireMainAdmin(), getActivityLogs);
 
 // ── Dashboard ──
 router.get('/dashboard/metrics', requireAdmin('dashboard'), getDashboardMetrics);
+router.get('/dashboard/revenue-chart', requireAdmin('dashboard'), getRevenueChart);
+router.get('/dashboard/top-shows', requireAdmin('dashboard'), getTopShowsChart);
 
 // ── Users ──
 router.get('/users', requireAuth, requireAdmin('users'), getAllUsers);

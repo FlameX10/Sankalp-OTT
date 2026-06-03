@@ -37,6 +37,9 @@ import { unlockEpisode } from '../../redux/slices/showPlayerSlice';
 import { usePlaybackSpeed } from '../../context/PlaybackSpeedContext';
 import { useGuestAuth } from '../../context/GuestAuthContext';
 
+const STARTUP_VIDEO_TRACK = { type: 'resolution', value: 720 };
+const AUTO_VIDEO_TRACK = { type: 'auto' };
+
 function DefaultTopOverlay({ top, style }) {
   return (
     <TouchableOpacity style={[style, { top }]}>
@@ -318,6 +321,7 @@ export default function ShortVideoReelItem({
               rate={playbackRate}
               repeat={true}
               controls={false}
+              selectedVideoTrack={firstFrameReady ? AUTO_VIDEO_TRACK : STARTUP_VIDEO_TRACK}
               progressUpdateInterval={500}
               onLoad={wrappedOnLoad}
               onProgress={onProgress}
@@ -349,6 +353,7 @@ export default function ShortVideoReelItem({
                 rate={playbackRate}
                 repeat={true}
                 controls={false}
+                selectedVideoTrack={firstFrameReady ? AUTO_VIDEO_TRACK : STARTUP_VIDEO_TRACK}
                 progressUpdateInterval={500}
                 onLoad={wrappedOnLoad}
                 onProgress={onProgress}

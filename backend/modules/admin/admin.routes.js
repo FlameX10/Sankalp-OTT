@@ -18,6 +18,7 @@ import {
   getRevenueChart,
   getTopShowsChart,
   getAnalyticsReport,
+  adjustShowViewCount,
 } from './admin.controller.js';
 import {
   getAdminMe,
@@ -65,5 +66,8 @@ router.get('/banners', requireAuth, requireAdmin('banners'), getBanners);
 router.post('/banners', requireAuth, requireAdmin('banners'), createBanner);
 router.put('/banners/:id', requireAuth, requireAdmin('banners'), updateBanner);
 router.delete('/banners/:id', requireAuth, requireAdmin('banners'), deleteBanner);
+
+// -- View count (dramas section) --
+router.post('/shows/:showId/view-count-adjust', requireAuth, requireAdmin('dramas'), adjustShowViewCount);
 
 export default router;

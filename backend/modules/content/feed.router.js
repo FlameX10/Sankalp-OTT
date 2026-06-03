@@ -3,6 +3,7 @@ import { prisma } from '../../prisma/client.js';
 import { allowGuest, requireAuth } from '../../middleware/auth.middleware.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { unlockEpisodeForUser } from '../user/episode-unlock.service.js';
+import { displayedViewCount } from '../user/view-count.service.js';
 
 const router = express.Router();
 
@@ -93,7 +94,7 @@ router.get('/for-you', allowGuest, async (req, res, next) => {
         episode_num: 1,
         hls_url: streamUrl,
         duration_sec: ep1.duration_sec,
-        view_count: show.view_count,
+        view_count: displayedViewCount(show),
         rating_avg: show.rating_avg,
         rating_count: show.rating_count,
         tags: show.show_tags.map(st => st.tag.name),
@@ -167,7 +168,7 @@ router.get('/show/:showId', allowGuest, async (req, res, next) => {
       show_title: show.title,
       synopsis: show.synopsis,
       thumbnail_url: show.thumbnail_url ? `/api/media/image/${show.id}/thumbnail` : null,
-      view_count: show.view_count,
+      view_count: displayedViewCount(show),
       rating_avg: show.rating_avg,
       rating_count: show.rating_count,
       tags: show.show_tags.map(st => st.tag.name),

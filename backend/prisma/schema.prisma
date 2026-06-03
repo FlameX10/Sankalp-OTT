@@ -224,12 +224,12 @@ model Show {
   thumbnail_url       String?  @db.VarChar(500)
   banner_url          String?  @db.VarChar(500)
   view_count          Int      @default(0)
+  manual_view_count   Int      @default(0)
   rating_avg          Float    @default(0)
   rating_count        Int      @default(0)
   feed_position       Int      @default(0)
   is_active           Boolean  @default(true)
   created_at          DateTime @default(now())
-  
 
   category         Category         @relation(fields: [category_id], references: [id])
   episodes         Episode[]
@@ -239,6 +239,7 @@ model Show {
   playlist_items   PlaylistItem[]
   collection_shows CollectionShow[]
   ratings          Rating[]
+  view_count_events ViewCountEvent[]
 
   @@index([category_id, is_active], name: "idx_shows_category")
   @@index([feed_position, is_active], name: "idx_shows_feed_position")
@@ -311,6 +312,30 @@ model EpisodeAccess {
 
   @@unique([user_id, episode_id], name: "idx_ea_user_ep")
   @@map("episode_access")
+}
+
+// ──────────────────────────────────────
+// VIEW COUNT EVENTS (audit log per qualified watch)
+// ──────────────────────────────────────
+
+model ViewCountEvent {
+  id                   String   @id @default(uuid()) @db.Uuid
+  session_id           String   @db.VarChar(100)
+  show_id              String   @db.Uuid
+  episode_id           String?  @db.Uuid
+  user_id              String?  @db.Uuid
+  watch_duration_sec   Int
+  source               String   @default("organic") @db.VarChar(10)
+  note                 String?  @db.Text
+  created_at           DateTime @default(now())
+
+  show Show @relation(fields: [show_id], references: [id], onDelete: Cascade)
+
+  // Deduplication key: one view per session per show
+  @@unique([session_id, show_id], name: "idx_vce_session_show")
+  @@index([show_id, created_at(sort: Desc)], name: "idx_vce_show_created")
+  @@index([created_at(sort: Desc)], name: "idx_vce_created")
+  @@map("view_count_events")
 }
 
 model CoinTransaction {

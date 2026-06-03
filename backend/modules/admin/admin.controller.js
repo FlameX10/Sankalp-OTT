@@ -2,6 +2,8 @@ import { prisma } from '../../prisma/client.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { AppError } from '../../middleware/error.middleware.js';
 import { getRevenueByPlan } from '../membership/membership.service.js';
+import { logAdminActivity } from '../../utils/adminActivity.js';
+import { displayedViewCount } from '../user/view-count.service.js';
 
 /**
  * GET /api/v1/admin/users
@@ -1196,6 +1198,95 @@ export async function getTopShowsChart(req, res, next) {
 
     return res.json(
       new ApiResponse(200, { chartData, period }, 'Top shows chart data fetched successfully')
+    );
+  } catch (error) {
+    next(error);
+  }
+}
+// ─────────────────────────────────────────────────────────────────
+// VIEW COUNT — Admin manual adjustment
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/v1/admin/shows/:showId/view-count-adjust
+ *
+ * Adds a manual count delta to a show's manual_view_count.
+ * Displayed count = organic view_count + manual_view_count.
+ * Each call logs a ViewCountEvent row (source: 'manual') for audit.
+ *
+ * Body: {
+ *   count_to_add: number  (positive integer only)
+ *   note:         string  (reason — required for audit trail)
+ * }
+ *
+ * Access: requireAdmin('dramas')
+ */
+export async function adjustShowViewCount(req, res, next) {
+  try {
+    const { showId } = req.params;
+    const { count_to_add, note } = req.body;
+
+    // Validate count_to_add
+    const delta = parseInt(count_to_add, 10);
+    if (!Number.isFinite(delta) || delta <= 0) {
+      throw new AppError('count_to_add must be a positive integer', 400);
+    }
+
+    // Note is required for the audit trail
+    if (!note || typeof note !== 'string' || !note.trim()) {
+      throw new AppError('A note/reason is required for manual view count adjustment', 400);
+    }
+
+    // Show must exist
+    const show = await prisma.show.findUnique({
+      where: { id: showId },
+      select: { id: true, title: true, view_count: true, manual_view_count: true },
+    });
+    if (!show) throw new AppError('Show not found', 404);
+
+    // Apply delta + write audit row — both in one transaction
+    const updatedShow = await prisma.$transaction(async (tx) => {
+      const updated = await tx.show.update({
+        where: { id: showId },
+        data: { manual_view_count: { increment: delta } },
+        select: { id: true, view_count: true, manual_view_count: true },
+      });
+
+      // Admin audit row — session_id prefix ensures it never collides with
+      // organic UUID v4 session IDs from the mobile client
+      await tx.viewCountEvent.create({
+        data: {
+          session_id: `admin_${req.user.id}_${Date.now()}`,
+          show_id: showId,
+          episode_id: null,
+          user_id: req.user.id,
+          watch_duration_sec: 0,
+          source: 'manual',
+          note: note.trim(),
+        },
+      });
+
+      return updated;
+    });
+
+    // Activity log (non-fatal — never blocks the response)
+    await logAdminActivity({
+      userId: req.user.id,
+      action: 'VIEW_COUNT_ADJUSTED',
+      entityType: 'SHOW',
+      entityId: showId,
+      details: JSON.stringify({ show_title: show.title, delta, note: note.trim() }),
+    });
+
+    return res.json(
+      new ApiResponse(200, {
+        show_id: showId,
+        show_title: show.title,
+        count_added: delta,
+        organic_view_count: updatedShow.view_count,
+        manual_view_count: updatedShow.manual_view_count,
+        displayed_view_count: displayedViewCount(updatedShow),
+      }, 'View count adjusted successfully')
     );
   } catch (error) {
     next(error);

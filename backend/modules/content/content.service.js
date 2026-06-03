@@ -1,5 +1,6 @@
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../middleware/error.middleware.js';
+import { displayedViewCount } from '../user/view-count.service.js';
 
 // ═══════════════════════════════════════
 // CATEGORIES
@@ -122,7 +123,7 @@ async function getAllShows({
     status: s.is_active ? 'Published' : 'Draft',
     tags: s.show_tags.map((st) => st.tag.name),
     tag_ids: s.show_tags.map((st) => st.tag.id),
-    view_count: s.view_count,
+    view_count: displayedViewCount(s),
     rating_avg: s.rating_avg,
     rating_count: s.rating_count,
     feed_position: s.feed_position,
@@ -147,6 +148,7 @@ async function getShowById(id) {
   if (!show) throw new AppError('Show not found', 404);
   return {
     ...show,
+    view_count: displayedViewCount(show),
     thumbnail_url: show.thumbnail_url,
     category_name: show.category.name,
     tags: show.show_tags.map((st) => st.tag.name),
@@ -183,6 +185,7 @@ async function createShow(data, adminId) {
       is_active,
       thumbnail_url: showData.thumbnail_url || null,
       banner_url: showData.banner_url || null,
+      manual_view_count: showData.manual_view_count || 0,
       show_tags: {
         create: tag_ids.map((tag_id) => ({ tag_id })),
       },

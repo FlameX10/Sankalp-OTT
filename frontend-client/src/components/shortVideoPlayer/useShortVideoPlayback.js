@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { recordView } from './viewCountApi';
+
+// Minimum cumulative active watch time before a view is counted.
+// Matches backend default: min_view_duration_seconds = 30.
+const MIN_VIEW_DURATION_SEC = 30;
 
 /**
  * useShortVideoPlayback
@@ -9,7 +14,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * onProgressUpdate(progressSec) – called every 15 seconds of actual playback.
  *   Use this to persist watch progress (e.g. upsertWatchHistory).
  *   Only fires when the video is actually playing (not paused, not locked).
+ *
+ * showId / episodeId – when provided, fires the view-count API once the user
+ *   has accumulated MIN_VIEW_DURATION_SEC of active (non-paused) playback time.
  */
+// UUID v4 generator - no external dependency needed.
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 export default function useShortVideoPlayback({
   streamUrl,
   isActive,
@@ -18,12 +34,25 @@ export default function useShortVideoPlayback({
   itemKey,
   initialDuration = 0,
   onProgressUpdate = null,
+  showId = null,
+  episodeId = null,
+  accessToken = null,
 }) {
   const lastTapAtRef = useRef(0);
   const videoRef = useRef(null);
   const lastProgressUpdateRef = useRef(0); // tracks last progress_sec we reported
   const pendingSeekRef = useRef(null);
   const currentTimeRef = useRef(0);
+
+  // ── View count refs (no re-renders needed) ──────────────────────
+  // sessionIdRef:      new UUID v4 each time itemKey changes (new episode/session).
+  // elapsedPlayRef:    cumulative active playback seconds (NOT seek position).
+  // viewFiredRef:      true once the API call has been fired this session.
+  // lastTickRef:       wall-clock ms of last onProgress tick, to measure real elapsed.
+  const sessionIdRef = useRef(null);
+  const elapsedPlayRef = useRef(0);
+  const viewFiredRef = useRef(false);
+  const lastTickRef = useRef(null);
 
   const [firstFrameReady, setFirstFrameReady] = useState(false);
   const [manuallyPaused, setManuallyPaused] = useState(false);
@@ -41,6 +70,11 @@ export default function useShortVideoPlayback({
     setDuration(initialDuration);
     lastProgressUpdateRef.current = 0; // reset progress tracker on item change
     pendingSeekRef.current = null;
+    // Reset view count tracking for the new session
+    sessionIdRef.current = generateUUID();
+    elapsedPlayRef.current = 0;
+    viewFiredRef.current = false;
+    lastTickRef.current = null;
   }, [initialDuration, itemKey]);
 
   const onLoad = useCallback((data) => {
@@ -93,7 +127,34 @@ export default function useShortVideoPlayback({
       console.log(`⏱️ Progress update: ${Math.floor(data.currentTime)}s / ${Math.floor(data.seekableDuration)}s`);
       onProgressUpdate(Math.floor(data.currentTime));
     }
-  }, [duration, onProgressUpdate, paused]);
+
+    // View count: accumulate active play time, fire API once at threshold.
+    // Uses wall-clock delta between onProgress ticks (500ms interval).
+    // Pausing resets the tick clock so paused time is never counted.
+    // Cap per-tick delta at 1s to guard against background/resume spikes.
+    if (!paused && showId && !viewFiredRef.current) {
+      const now = Date.now();
+      if (lastTickRef.current !== null) {
+        const deltaSec = Math.min((now - lastTickRef.current) / 1000, 1);
+        elapsedPlayRef.current += deltaSec;
+        if (elapsedPlayRef.current >= MIN_VIEW_DURATION_SEC) {
+          viewFiredRef.current = true;
+          console.log(`[viewCount] ${elapsedPlayRef.current.toFixed(1)}s reached -- firing for show: ${showId}`);
+          recordView({
+            showId,
+            sessionId: sessionIdRef.current,
+            episodeId: episodeId ?? null,
+            watchDurationSec: elapsedPlayRef.current,
+            accessToken,
+          });
+        }
+      }
+      lastTickRef.current = now;
+    } else if (paused) {
+      lastTickRef.current = null;
+    }
+
+  }, [duration, onProgressUpdate, paused, showId, episodeId, accessToken]);
 
   const onReadyForDisplay = useCallback(() => {
     console.log(`🎬 [useShortVideoPlayback] First frame ready, itemKey: ${itemKey}`);

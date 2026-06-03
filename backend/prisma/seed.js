@@ -83,6 +83,8 @@ async function seed() {
       checkin_day_6: '30',
       checkin_day_7: '50',
       default_coin_cost: '30',
+      // View count system
+      min_view_duration_seconds: '30',
     };
 
     for (const [key, value] of Object.entries(settings)) {

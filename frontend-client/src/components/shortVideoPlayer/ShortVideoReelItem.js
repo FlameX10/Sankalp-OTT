@@ -130,6 +130,9 @@ export default function ShortVideoReelItem({
     itemKey: item.episode_id,
     initialDuration: item.duration_sec || 0,
     onProgressUpdate,
+    showId: item.show_id,
+    episodeId: item.episode_id,
+    accessToken,
   });
   const showMainOverlay = showOttOverlayControls || controlsVisible || manuallyPaused;
 

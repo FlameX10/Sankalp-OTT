@@ -14,6 +14,7 @@ import {
   createBanner,
   updateBanner,
   deleteBanner,
+  toggleBanner,
   getDashboardMetrics,
   getRevenueChart,
   getTopShowsChart,
@@ -66,6 +67,7 @@ router.get('/reports/:reportType', requireAuth, requireAdmin('analytics'), getAn
 router.get('/banners', requireAuth, requireAdmin('banners'), getBanners);
 router.post('/banners', requireAuth, requireAdmin('banners'), createBanner);
 router.put('/banners/:id', requireAuth, requireAdmin('banners'), updateBanner);
+router.patch('/banners/:id/toggle', requireAuth, requireAdmin('banners'), toggleBanner);
 router.delete('/banners/:id', requireAuth, requireAdmin('banners'), deleteBanner);
 
 // ── View count (dramas section) --

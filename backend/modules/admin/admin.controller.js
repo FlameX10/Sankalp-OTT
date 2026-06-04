@@ -607,8 +607,8 @@ export async function updateBanner(req, res, next) {
         show_id: resolvedShowId,
         image_url,
         is_active: is_active !== undefined ? Boolean(is_active) : undefined,
-        starts_at: starts_at ? new Date(starts_at) : undefined,
-        ends_at: ends_at ? new Date(ends_at) : undefined,
+        starts_at: starts_at ? new Date(starts_at) : null,
+        ends_at: ends_at ? new Date(ends_at) : null,
       },
     });
 
@@ -620,7 +620,43 @@ export async function updateBanner(req, res, next) {
         show_id: updated.show_id,
         show_name: show?.title || null,
         is_active: updated.is_active,
+        starts_at: updated.starts_at ? updated.starts_at.toISOString().split('T')[0] : null,
+        ends_at: updated.ends_at ? updated.ends_at.toISOString().split('T')[0] : null,
       }, 'Banner updated successfully')
+    );
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * PATCH /api/v1/admin/banners/:id/toggle
+ * Toggle a banner's is_active status
+ */
+export async function toggleBanner(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.banner.findUnique({ where: { id } });
+    if (!existing) throw new AppError('Banner not found', 404);
+
+    const updated = await prisma.banner.update({
+      where: { id },
+      data: { is_active: !existing.is_active },
+    });
+
+    await prisma.adminActivityLog.create({
+      data: {
+        user_id: req.user.id,
+        action: updated.is_active ? 'BANNER_ACTIVATED' : 'BANNER_DEACTIVATED',
+        entity_type: 'BANNER',
+        entity_id: id,
+        details: JSON.stringify({ title: existing.title, is_active: updated.is_active }),
+      },
+    }).catch(() => {}); // non-fatal
+
+    return res.json(
+      new ApiResponse(200, { id: updated.id, is_active: updated.is_active }, 'Banner toggled successfully')
     );
   } catch (error) {
     next(error);

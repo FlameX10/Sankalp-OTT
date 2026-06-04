@@ -45,6 +45,12 @@ async function getShows(req, res, next) {
 async function getShow(req, res, next) {
   try { res.json(await service.getShowById(req.params.id)); } catch (e) { next(e); }
 }
+async function getRelatedShows(req, res, next) {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 6, 6);
+    res.json(await service.getRelatedShows(req.params.id, limit));
+  } catch (e) { next(e); }
+}
 async function createShow(req, res, next) {
   try { res.status(201).json(await service.createShow(req.body, req.admin.id)); } catch (e) { next(e); }
 }
@@ -100,7 +106,7 @@ async function getHomeAnnouncements(req, res, next) {
 export {
   getCategories, createCategory, updateCategory, deleteCategory,
   getTags, createTag, updateTag, deleteTag,
-  getShows, getShow, createShow, updateShow, deleteShow, togglePublish, updateFeedPosition,
+  getShows, getShow, getRelatedShows, createShow, updateShow, deleteShow, togglePublish, updateFeedPosition,
   getEpisodes, createEpisode, updateEpisode, deleteEpisode,
   getHomeBanners, getHomeAnnouncements,
 };

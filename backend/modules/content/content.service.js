@@ -178,6 +178,64 @@ async function getShowById(id) {
   };
 }
 
+/** Up to 6 published dramas sharing at least one tag with the given show. */
+async function getRelatedShows(showId, limit = 6) {
+  const show = await prisma.show.findUnique({
+    where: { id: showId },
+    include: { show_tags: { select: { tag_id: true } } },
+  });
+  if (!show) throw new AppError('Show not found', 404);
+
+  const tagIds = show.show_tags.map((st) => st.tag_id);
+  if (tagIds.length === 0) return { items: [] };
+
+  const tagIdSet = new Set(tagIds);
+  const candidates = await prisma.show.findMany({
+    where: {
+      id: { not: showId },
+      is_active: true,
+      show_tags: { some: { tag_id: { in: tagIds } } },
+    },
+    take: Math.min(limit * 4, 24),
+    include: {
+      category: { select: { id: true, name: true } },
+      show_tags: { include: { tag: { select: { id: true, name: true } } } },
+      _count: { select: { episodes: true } },
+    },
+  });
+
+  const ranked = candidates
+    .map((s) => ({
+      show: s,
+      matchCount: s.show_tags.filter((st) => tagIdSet.has(st.tag_id)).length,
+    }))
+    .sort(
+      (a, b) =>
+        b.matchCount - a.matchCount
+        || b.show.created_at.getTime() - a.show.created_at.getTime()
+    )
+    .slice(0, limit)
+    .map(({ show: s }) => s);
+
+  const items = ranked.map((s) => ({
+    id: s.id,
+    title: s.title,
+    synopsis: s.synopsis,
+    category: s.category.name,
+    category_id: s.category.id,
+    status: 'Published',
+    tags: s.show_tags.map((st) => st.tag.name),
+    tag_ids: s.show_tags.map((st) => st.tag.id),
+    view_count: displayedViewCount(s),
+    rating_avg: s.rating_avg,
+    rating_count: s.rating_count,
+    thumbnail_url: s.thumbnail_url,
+    episode_count: s._count.episodes,
+  }));
+
+  return { items };
+}
+
 async function createShow(data, adminId) {
   const { tag_ids = [], ...showData } = data;
 
@@ -524,7 +582,7 @@ async function getLatestAnnouncements(limit = 3) {
 export {
   getAllCategories, getCategoryById, createCategory, updateCategory, deleteCategory,
   getAllTags, createTag, updateTag, deleteTag,
-  getAllShows, getShowById, createShow, updateShow, deleteShow, toggleShowPublish, updateFeedPosition,
+  getAllShows, getShowById, getRelatedShows, createShow, updateShow, deleteShow, toggleShowPublish, updateFeedPosition,
   getEpisodesByShow, createEpisode, updateEpisode, deleteEpisode,
   getActiveHomeBanners, getLatestAnnouncements,
 };

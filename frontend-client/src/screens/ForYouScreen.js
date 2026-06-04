@@ -127,6 +127,22 @@ export default function ForYouScreen() {
     }));
   }, [dispatch]);
 
+  const handleRelatedPress = useCallback(
+    (relatedItem) => {
+      openDramaDetails({
+        show_id: relatedItem.id,
+        show_title: relatedItem.title,
+        title: relatedItem.title,
+        thumbnail_url: relatedItem.thumbnail_url,
+        synopsis: relatedItem.synopsis,
+        tags: relatedItem.tags,
+        total_episodes: relatedItem.episode_count || 0,
+        episode_num: 1,
+      });
+    },
+    [openDramaDetails]
+  );
+
   const handleOpenSynopsis = useCallback((item) => {
     openDramaDetails(item, 'synopsis');
   }, [openDramaDetails]);
@@ -276,6 +292,7 @@ export default function ForYouScreen() {
         onRangeChange={handleRangeChange}
         onClose={handleCloseSheet}
         onEpisodePress={handleEpisodePress}
+        onRelatedPress={handleRelatedPress}
         streamBase={API_BASE_URL}
       />
     </View>

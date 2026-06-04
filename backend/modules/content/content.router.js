@@ -26,6 +26,7 @@ router.delete('/tags/:id', requireAuth, requireAdmin('categories'), ctrl.deleteT
 
 // ── Shows (Dramas) ──
 router.get('/shows', ctrl.getShows);
+router.get('/shows/:id/related', ctrl.getRelatedShows);
 router.get('/shows/:id', ctrl.getShow);
 router.post('/shows', requireAuth, requireAdmin('dramas'), validate(createShowSchema), ctrl.createShow);
 router.put('/shows/:id', requireAuth, requireAdmin('dramas'), validate(updateShowSchema), ctrl.updateShow);

@@ -206,9 +206,10 @@ export default function PopularScreen() {
       const selectedItem = {
         ...item,
         show_id: showId,
-        show_title: item.title,
+        show_title: item.title ?? item.show_title,
+        title: item.title ?? item.show_title,
         episode_num: 1,
-        total_episodes: item.episode_count || 0,
+        total_episodes: item.episode_count || item.total_episodes || 0,
       };
       setSelected(selectedItem);
       setSheetInitialTab(initialTab);
@@ -217,6 +218,22 @@ export default function PopularScreen() {
       fetchShowDetails(showId, 1);
     },
     [dispatch, accessToken]
+  );
+
+  const handleRelatedPress = useCallback(
+    (relatedItem) => {
+      openDetails({
+        id: relatedItem.id,
+        title: relatedItem.title,
+        thumbnail_url: relatedItem.thumbnail_url,
+        category: relatedItem.category,
+        category_name: relatedItem.category,
+        view_count: relatedItem.view_count,
+        tags: relatedItem.tags,
+        episode_count: relatedItem.episode_count,
+      });
+    },
+    [openDetails]
   );
 
   useEffect(() => {
@@ -356,6 +373,7 @@ export default function PopularScreen() {
         initialTab={sheetInitialTab}
         onRangeChange={handleRangeChange}
         onEpisodePress={handleEpisodePress}
+        onRelatedPress={handleRelatedPress}
         onClose={handleCloseSheet}
       />
     </View>

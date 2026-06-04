@@ -27,10 +27,18 @@ const debugThumbnail = (source, details_tn, item_tn, details_id, item_id) => {
   });
 };
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const SHEET_HEIGHT = Math.round(SCREEN_HEIGHT * 0.9);
 const EPISODE_GAP = 6;
 const EPISODES_PER_PAGE = 30;
+const RELATED_CARD_WIDTH = Math.floor((SCREEN_WIDTH - 32 - 24) / 3);
+const RELATED_LIMIT = 6;
+
+function resolveThumbnailUrl(url) {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  return `${API_BASE_URL}${url}`;
+}
 
 function Tag({ label }) {
   return (
@@ -58,6 +66,22 @@ function buildRanges(totalEpisodes) {
   }
 
   return ranges;
+}
+
+function RelatedDramaCard({ drama, onPress }) {
+  const uri = resolveThumbnailUrl(drama.thumbnail_url);
+  return (
+    <Pressable style={styles.relatedCard} onPress={onPress}>
+      {uri ? (
+        <Image source={{ uri }} style={styles.relatedPoster} resizeMode="cover" />
+      ) : (
+        <View style={[styles.relatedPoster, styles.posterFallback]} />
+      )}
+      <Text style={styles.relatedTitle} numberOfLines={2}>
+        {drama.title}
+      </Text>
+    </Pressable>
+  );
 }
 
 function EpisodeCell({ episode, isCurrentEpisode, onPress }) {
@@ -100,10 +124,13 @@ export default function DramaDetailsSheetConnected({
   onClose,
   onRangeChange,
   onEpisodePress,
+  onRelatedPress,
 }) {
   // All hooks must be called unconditionally, before any returns
   const [tab, setTab] = useState(initialTab);
   const [activeRangeStart, setActiveRangeStart] = useState(1);
+  const [relatedShows, setRelatedShows] = useState([]);
+  const [relatedLoading, setRelatedLoading] = useState(false);
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -113,6 +140,38 @@ export default function DramaDetailsSheetConnected({
     setActiveRangeStart(getRangeStart(item.episode_num || 1));
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   }, [visible, initialTab, item]);
+
+  useEffect(() => {
+    if (!visible || !item?.show_id) {
+      setRelatedShows([]);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const showId = item.show_id;
+
+    async function loadRelated() {
+      setRelatedLoading(true);
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/api/content/shows/${showId}/related?limit=${RELATED_LIMIT}`
+        );
+        const data = await res.json();
+        if (cancelled) return;
+        const items = Array.isArray(data?.items) ? data.items : [];
+        setRelatedShows(items.slice(0, RELATED_LIMIT));
+      } catch {
+        if (!cancelled) setRelatedShows([]);
+      } finally {
+        if (!cancelled) setRelatedLoading(false);
+      }
+    }
+
+    loadRelated();
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, item?.show_id]);
 
   // Move useMemo BEFORE the early return
   const posterSource = useMemo(() => {
@@ -306,6 +365,25 @@ export default function DramaDetailsSheetConnected({
                 )}
               </View>
             )}
+
+            {(relatedLoading || relatedShows.length > 0) && tags.length > 0 ? (
+              <View style={styles.relatedSection}>
+                <Text style={styles.sectionTitle}>More like this</Text>
+                {relatedLoading ? (
+                  <ActivityIndicator size="small" color={theme.white} style={styles.relatedLoader} />
+                ) : (
+                  <View style={styles.relatedGrid}>
+                    {relatedShows.map((drama) => (
+                      <RelatedDramaCard
+                        key={drama.id}
+                        drama={drama}
+                        onPress={() => onRelatedPress && onRelatedPress(drama)}
+                      />
+                    ))}
+                  </View>
+                )}
+              </View>
+            ) : null}
           </ScrollView>
         </View>
       </View>
@@ -519,5 +597,35 @@ const styles = StyleSheet.create({
     color: theme.white,
     fontSize: 13,
     fontWeight: '700',
+  },
+  relatedSection: {
+    marginTop: 28,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.06)',
+  },
+  relatedLoader: {
+    marginVertical: 16,
+  },
+  relatedGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  relatedCard: {
+    width: RELATED_CARD_WIDTH,
+  },
+  relatedPoster: {
+    width: '100%',
+    aspectRatio: 3 / 4,
+    borderRadius: 8,
+    backgroundColor: theme.surface,
+  },
+  relatedTitle: {
+    color: theme.white,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 6,
+    lineHeight: 16,
   },
 });

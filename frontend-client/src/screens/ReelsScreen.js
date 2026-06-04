@@ -286,7 +286,7 @@ export default function PopularScreen() {
           <Ionicons name="search" size={18} color="#666" style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search dramas..."
+            placeholder="Search dramas or tags..."
             placeholderTextColor="#666"
             value={searchQuery}
             onChangeText={setSearchQuery}

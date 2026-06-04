@@ -92,10 +92,31 @@ async function getAllShows({
   else if (status === 'Draft') where.is_active = false;
   else if (!include_inactive) where.is_active = true;
   if (search) {
-    where.OR = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { synopsis: { contains: search, mode: 'insensitive' } },
+    const term = String(search).trim();
+    const tokens = term.split(/\s+/).filter(Boolean);
+    const orConditions = [
+      { title: { contains: term, mode: 'insensitive' } },
+      { synopsis: { contains: term, mode: 'insensitive' } },
+      {
+        show_tags: {
+          some: {
+            tag: { name: { contains: term, mode: 'insensitive' } },
+          },
+        },
+      },
     ];
+
+    for (const token of tokens) {
+      orConditions.push({
+        show_tags: {
+          some: {
+            tag: { name: { contains: token, mode: 'insensitive' } },
+          },
+        },
+      });
+    }
+
+    where.OR = orConditions;
   }
 
   const [shows, total] = await Promise.all([

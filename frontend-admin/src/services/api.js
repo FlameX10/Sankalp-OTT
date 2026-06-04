@@ -201,6 +201,7 @@ export const showsApi = {
   delete: (id) => api.delete(`/content/shows/${id}`),
   togglePublish: (id) => api.patch(`/content/shows/${id}/publish`),
   updateFeedPosition: (id, position) => api.patch(`/content/shows/${id}/feed-position`, { feed_position: position }),
+  adjustViewCount: (id, data) => api.post(`/v1/admin/shows/${id}/view-count-adjust`, data),
 };
 
 // ── Episodes ──

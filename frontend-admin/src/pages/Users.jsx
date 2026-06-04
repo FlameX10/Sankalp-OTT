@@ -57,7 +57,7 @@ function UserProfileModal({ open, onClose, user }) {
               <div style={{ color:'var(--text3)', fontSize:13 }}>{displayUser.email}</div>
             </div>
             <div style={{ marginLeft:'auto' }}>
-              <span className={`badge ${user.status==='Active'?'badge-green':'badge-red'}`}>{user.status}</span>
+              <span className={`badge ${user.status==='Active'?'badge-green':user.status==='Inactive'?'badge-red':'badge-gray'}`}>{user.status}</span>
             </div>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
@@ -150,8 +150,8 @@ function UserProfileModal({ open, onClose, user }) {
                     <div style={{ fontSize:13 }}>{c.title || c.reason || 'Transaction'}</div>
                     <div style={{ display:'flex', gap:12, alignItems:'center' }}>
                       <span style={{ fontSize:12, color:'var(--text3)' }}>{new Date(c.created_at).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' })}</span>
-                      <span style={{ fontFamily:'var(--mono)', fontSize:13, color:c.type === 'credit' ? 'var(--green)' : 'var(--red)' }}>
-                        {c.type === 'credit' ? '+' : '-'}₵ {Math.abs(c.amount).toLocaleString()}
+                      <span style={{ fontFamily:'var(--mono)', fontSize:13, color:c.type?.toUpperCase() === 'CREDIT' ? 'var(--green)' : 'var(--red)' }}>
+                        {c.type?.toUpperCase() === 'CREDIT' ? '+' : '-'}₵ {Math.abs(c.amount).toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -301,6 +301,21 @@ export default function Users() {
         </div>
       ) : (
         <>
+      {/* Stat cards */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
+        {[
+          { label:'TOTAL USERS', value: users.length, sub:'registered users' },
+          { label:'FREE USERS', value: users.filter(u => u.plan !== 'MEMBER' && u.role === 'user').length, sub:'on free plan' },
+          { label:'MEMBERS', value: users.filter(u => u.plan === 'MEMBER').length, sub:'active memberships' },
+        ].map(card => (
+          <div key={card.label} className="metric-card" style={{ display:'flex', flexDirection:'column', gap:4 }}>
+            <div className="metric-label">{card.label}</div>
+            <div className="metric-value" style={{ fontSize:22 }}>{card.value}</div>
+            <div className="metric-sub"><span>{card.sub}</span></div>
+          </div>
+        ))}
+      </div>
+
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
         <div>
           <div style={{ fontWeight:600 }}>{users.length} registered users</div>
@@ -325,10 +340,18 @@ export default function Users() {
         <div className="table-wrap">
           <table>
             <thead>
-              <tr><th>User</th><th>Email</th><th>Role</th><th>User Type</th><th>Subscription</th><th>Coins</th><th>Joined</th><th>Status</th><th>Actions</th></tr>
+              <tr><th>User</th><th>Email</th><th>Role</th><th>User Type</th><th>Membership End Date</th><th>Coins</th><th>Joined</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
-              {filtered.map(u => (
+              {[...filtered].sort((a, b) => {
+                const isAdminA = a.role === 'admin' || a.role === 'sub_admin'
+                const isAdminB = b.role === 'admin' || b.role === 'sub_admin'
+                if (isAdminA && !isAdminB) return 1
+                if (!isAdminA && isAdminB) return -1
+                return 0
+              }).map(u => {
+                const isAdmin = u.role === 'admin' || u.role === 'sub_admin'
+                return (
                 <tr key={u.id}>
                   <td>
                     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -338,19 +361,22 @@ export default function Users() {
                   </td>
                   <td style={{ color:'var(--text2)' }}>{u.email}</td>
                   <td><span className={`badge ${roleBadge[u.role]}`}>{u.role}</span></td>
-                  <td><span className={`badge ${u.plan==='MEMBER'?'badge-purple':'badge-amber'}`}>{u.plan==='MEMBER'?'Member':'Free'}</span></td>
+                  <td>{isAdmin ? <span style={{ color:'var(--text3)', fontSize:12 }}>—</span> : <span className={`badge ${u.plan==='MEMBER'?'badge-purple':'badge-amber'}`}>{u.plan==='MEMBER'?'Member':'Free'}</span>}</td>
                   <td style={{ fontSize:11, color:'var(--text3)' }}>{u.subscription}</td>
-                  <td><span className="coin-pill">₵ {u.coins.toLocaleString()}</span></td>
+                  <td>{isAdmin ? <span style={{ color:'var(--text3)', fontSize:12 }}>—</span> : <span className="coin-pill">₵ {u.coins.toLocaleString()}</span>}</td>
                   <td style={{ color:'var(--text3)', fontSize:12 }}>{u.joined}</td>
-                  <td><span className={`badge ${u.status==='Active'?'badge-green':'badge-red'}`}>{u.status}</span></td>
+                  <td>{isAdmin ? <span style={{ color:'var(--text3)', fontSize:12 }}>—</span> : <span className={`badge ${u.status==='Active'?'badge-green':u.status==='Inactive'?'badge-red':'badge-gray'}`}>{u.status}</span>}</td>
                   <td>
+                    {isAdmin ? <span style={{ color:'var(--text3)', fontSize:12 }}>—</span> : (
                     <div style={{ display:'flex', gap:5 }}>
                       <button className="btn btn-ghost btn-sm" onClick={() => open('profile', u)}><Eye size={11}/> View</button>
                       <button className="btn btn-ghost btn-sm" onClick={() => open('coins', u)}><Coins size={11}/> Coins</button>
                     </div>
+                    )}
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>

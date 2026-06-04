@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { Search, Plus, Edit2, Trash2, BarChart2, ChevronUp, ChevronDown, Lock, Unlock, Star, Video, X, CheckCircle2, Loader } from 'lucide-react'
+import { Search, Plus, Edit2, Trash2, BarChart2, ChevronUp, ChevronDown, Lock, Unlock, Star, Video, X, CheckCircle2, Loader, TrendingUp } from 'lucide-react'
 import Modal, { ModalSection, FormGroup } from '../components/ui/Modal.jsx'
 import { Toggle, StepBar, FileDropzone, ConfirmDialog } from '../components/ui/Controls.jsx'
 import { useDramas } from '../services/useDramas.js'
-import { episodesApi } from '../services/api.js'
+import { episodesApi, showsApi } from '../services/api.js'
 
 // Helper function to convert MM:SS duration string to seconds
 function durationToSeconds(durationStr) {
@@ -86,7 +86,7 @@ function VideoDropzone({ file, onFileChange, uploadProgress }) {
 const ALL_TAGS = ['Romance', 'CEO', 'Revenge', 'Comedy', 'School', 'Thriller', 'Trending', 'Action', 'Fantasy', 'Slice of Life', 'Strong Heroine', 'Werewolf', 'Hidden Identity', 'Billionaire', 'Family Bonds', 'Forced Love']
 
 const tagColor = { Romance:'badge-pink', Trending:'badge-amber', CEO:'badge-blue', Revenge:'badge-red', Comedy:'badge-green', School:'badge-blue', Thriller:'badge-red', Action:'badge-amber', Billionaire:'badge-purple', 'Strong Heroine':'badge-pink', 'Hidden Identity':'badge-blue', Fantasy:'badge-purple' }
-const emptyDrama = { title:'', synopsis:'', category:'', status:'Published', tags:[], episodes:[], feed_position:0 }
+const emptyDrama = { title:'', synopsis:'', category:'', status:'Published', tags:[], episodes:[], feed_position:0, manual_view_count:0 }
 const emptyEp = { title:'', duration:'', is_free:true, coin_cost:0, videoFile:null, uploadProgress:0 }
 
 function DramaModal({ open, onClose, onSave, initial, initialStep = 0, autoAddEp = false, categories = [] }) {
@@ -248,6 +248,18 @@ function DramaModal({ open, onClose, onSave, initial, initialStep = 0, autoAddEp
                   {form.feed_position > 0 
                     ? `Position ${form.feed_position} in For You feed`
                     : 'Set 1, 2, 3… to show in For You feed. 0 = not featured.'}
+                </div>
+              </div>
+            </FormGroup>
+            <FormGroup label="Starting view count">
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <input className="input" type="number" min="0" style={{ width:120 }}
+                  placeholder="0" value={form.manual_view_count || ''}
+                  onChange={e => upd('manual_view_count', parseInt(e.target.value) || 0)} />
+                <div style={{ fontSize:11, color:'var(--text3)' }}>
+                  {form.manual_view_count > 0
+                    ? `Displayed count will start at ${Number(form.manual_view_count).toLocaleString()} and grow from there`
+                    : 'Optional boost. Organic watches add on top. Not visible as separate to users.'}
                 </div>
               </div>
             </FormGroup>
@@ -564,6 +576,97 @@ function EditEpisodeModal({ open, onClose, drama, onSave }) {
   )
 }
 
+
+function ViewCountModal({ open, onClose, drama, onSave }) {
+  const [countToAdd, setCountToAdd] = useState('')
+  const [note, setNote] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (open) { setCountToAdd(''); setNote(''); setError(''); setSaving(false) }
+  }, [open])
+
+  const handleSubmit = async () => {
+    setError('')
+    const delta = parseInt(countToAdd, 10)
+    if (!delta || delta <= 0) { setError('Enter a positive number'); return }
+    if (!note.trim()) { setError('A reason is required'); return }
+    setSaving(true)
+    try {
+      await onSave(drama.id, { count_to_add: delta, note: note.trim() })
+      onClose()
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.response?.data?.message || 'Failed to adjust view count')
+    } finally { setSaving(false) }
+  }
+
+  if (!open || !drama) return null
+
+  const currentDisplayed = (drama.view_count || 0)
+  const preview = currentDisplayed + (parseInt(countToAdd, 10) || 0)
+
+  return (
+    <Modal open={open} onClose={onClose} title={`Adjust View Count — ${drama.title}`} width={480}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
+            {saving ? 'Saving...' : 'Apply Adjustment'}
+          </button>
+        </>
+      }
+    >
+      <ModalSection title="Current count">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 4 }}>
+          <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: 14, textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>DISPLAYED NOW</div>
+            <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--accent2)' }}>
+              {currentDisplayed.toLocaleString()}
+            </div>
+          </div>
+          <div style={{ background: 'var(--bg3)', borderRadius: 8, padding: 14, textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>AFTER ADJUSTMENT</div>
+            <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--mono)', color: parseInt(countToAdd) > 0 ? 'var(--green)' : 'var(--text3)' }}>
+              {preview.toLocaleString()}
+            </div>
+          </div>
+        </div>
+      </ModalSection>
+
+      <ModalSection title="Adjustment">
+        <FormGroup label="Count to add *">
+          <input
+            className="input"
+            type="number"
+            min="1"
+            placeholder="e.g. 10000"
+            value={countToAdd}
+            onChange={e => setCountToAdd(e.target.value)}
+            style={{ width: '100%' }}
+          />
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Positive integers only. Added on top of the current count.</div>
+        </FormGroup>
+        <FormGroup label="Reason / note *">
+          <input
+            className="input"
+            placeholder="e.g. Launch boost for featured show"
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            style={{ width: '100%' }}
+          />
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Stored in audit log. Not shown to users.</div>
+        </FormGroup>
+        {error && (
+          <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, fontSize: 12, color: 'var(--red)' }}>
+            {error}
+          </div>
+        )}
+      </ModalSection>
+    </Modal>
+  )
+}
+
 export default function Dramas() {
   const { dramas, categories, loading, createDrama, updateDrama, deleteDrama: apiDeleteDrama, togglePublish: apiTogglePublish, reload } = useDramas()
   const ALL_CATEGORIES = categories.map(c => c.name)
@@ -573,6 +676,8 @@ export default function Dramas() {
   const [modal, setModal] = useState(null)
   const [selected, setSelected] = useState(null)
   const [expandedDramaId, setExpandedDramaId] = useState(null)
+  const [vcModal, setVcModal] = useState(false)
+  const [vcDrama, setVcDrama] = useState(null)
 
   const filtered = dramas.filter(d => {
     const m = d.title.toLowerCase().includes(q.toLowerCase()) || (d.tags||[]).some(t => t.toLowerCase().includes(q.toLowerCase()))
@@ -598,6 +703,11 @@ export default function Dramas() {
     try { await apiDeleteDrama(id) } catch { alert('Failed to delete') }
     setModal(null)
   }
+  const adjustViewCount = async (showId, data) => {
+    await showsApi.adjustViewCount(showId, data)
+    await reload()
+  }
+
   const togglePublish = async (id) => {
     try { await apiTogglePublish(id) } catch { alert('Failed to toggle') }
   }
@@ -718,6 +828,7 @@ export default function Dramas() {
                       <button className="btn btn-ghost btn-sm" onClick={() => open('edit', d)} title="Edit drama details"><Edit2 size={11}/></button>
                       <button className="btn btn-ghost btn-sm" onClick={() => open('add-ep', d)} style={{ color: 'var(--accent2)' }} title="Add new episode"><Plus size={11}/></button>
                       <button className="btn btn-ghost btn-sm" onClick={() => open('stats', d)} title="View analytics"><BarChart2 size={11}/></button>
+                      <button className="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); setVcDrama(d); setVcModal(true) }} title="Adjust view count" style={{ color: 'var(--green)' }}><TrendingUp size={11}/></button>
                       <button className={`btn btn-sm ${d.status==='Published'?'btn-danger':'btn-primary'}`} onClick={() => togglePublish(d.id)} style={{ fontSize: 10, whiteSpace: 'nowrap' }} title={d.status==='Published' ? 'Unpublish drama' : 'Publish drama'}>
                         {d.status==='Published'?'Unpublish':'Publish'}
                       </button>
@@ -843,6 +954,8 @@ export default function Dramas() {
           alert('Failed to update episode: ' + (err.response?.data?.error || err.message))
         }
       }} />
+
+      <ViewCountModal open={vcModal} onClose={() => { setVcModal(false); setVcDrama(null) }} drama={vcDrama} onSave={adjustViewCount} />
 
       {/* Delete Episode Confirmation */}
       <ConfirmDialog 

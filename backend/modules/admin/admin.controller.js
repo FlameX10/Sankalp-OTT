@@ -12,48 +12,83 @@ import { displayedViewCount } from '../user/view-count.service.js';
  */
 export async function getAllUsers(req, res, next) {
   try {
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        plan: true,
-        coins: true,
-        isBlocked: true,
-        createdAt: true,
-        memberships: {
-          where: { status: 'ACTIVE' },
-          orderBy: { end_date: 'desc' },
-          take: 1,
-          select: { end_date: true, status: true },
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const [users, recentCheckins, recentWatchHistory] = await Promise.all([
+      prisma.user.findMany({
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          plan: true,
+          coins: true,
+          isBlocked: true,
+          createdAt: true,
+          memberships: {
+            where: { status: 'ACTIVE' },
+            orderBy: { end_date: 'desc' },
+            take: 1,
+            select: { end_date: true, status: true },
+          },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      }),
+      // Users who checked in within last 7 days
+      prisma.dailyCheckin.findMany({
+        where: { created_at: { gte: sevenDaysAgo } },
+        select: { user_id: true },
+        distinct: ['user_id'],
+      }),
+      // Users who watched something within last 7 days
+      prisma.watchHistory.findMany({
+        where: { last_watched: { gte: sevenDaysAgo } },
+        select: { user_id: true },
+        distinct: ['user_id'],
+      }),
+    ]);
+
+    // Build a Set of user IDs active in last 7 days
+    const activeUserIds = new Set([
+      ...recentCheckins.map(c => c.user_id),
+      ...recentWatchHistory.map(w => w.user_id),
+    ]);
 
     // Format response for frontend
-    const formattedUsers = users.map(u => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      role: u.role === 'USER' ? 'user' : u.role === 'ADMIN' ? 'admin' : 'sub_admin',
-      plan: u.plan || 'FREE',
-      coins: u.coins || 0,
-      joined: new Date(u.createdAt).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      }),
-      status: u.isBlocked ? 'Blocked' : 'Active',
-      subscription: u.memberships.length > 0
-        ? new Date(u.memberships[0].end_date).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-          })
-        : '—',
-    }));
+    const formattedUsers = users.map(u => {
+      let status;
+      if (u.isBlocked) {
+        status = 'Blocked';
+      } else if (activeUserIds.has(u.id)) {
+        status = 'Active';
+      } else {
+        status = 'Inactive';
+      }
+
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role === 'USER' ? 'user' : u.role === 'ADMIN' ? 'admin' : 'sub_admin',
+        plan: u.plan || 'FREE',
+        coins: u.coins || 0,
+        joined: new Date(u.createdAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        }),
+        status,
+        subscription: u.memberships.length > 0
+          ? new Date(u.memberships[0].end_date).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })
+          : '—',
+      };
+    });
 
     return res.json(
       new ApiResponse(200, { users: formattedUsers, total: formattedUsers.length }, 'Users fetched successfully')

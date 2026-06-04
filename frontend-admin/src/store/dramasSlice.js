@@ -132,6 +132,7 @@ export const createDrama = createAsyncThunk(
         category_id:         cat.id,
         tag_ids:             tagIds,
         feed_position: parseInt(formData.feed_position) || 0,
+        manual_view_count: parseInt(formData.manual_view_count) || 0,
         is_active: true,
       })
 
@@ -190,6 +191,7 @@ export const updateDrama = createAsyncThunk(
         category_id:         cat?.id,
         tag_ids:             tagIds,
         feed_position: parseInt(formData.feed_position) || 0,
+        manual_view_count: parseInt(formData.manual_view_count) || 0,
         is_active: true,
       })
 

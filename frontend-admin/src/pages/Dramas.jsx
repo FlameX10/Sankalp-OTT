@@ -450,37 +450,76 @@ function DramaModal({ open, onClose, onSave, initial, initialStep = 0, autoAddEp
 }
 
 function StatsModal({ open, onClose, drama }) {
+  const [stats, setStats] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!open || !drama?.id) return
+    setStats(null)
+    setLoading(true)
+    showsApi.getStats(drama.id)
+      .then(res => setStats(res.data.data))
+      .catch(() => setStats(null))
+      .finally(() => setLoading(false))
+  }, [open, drama?.id])
+
   if (!drama || !open) return null
+
   return (
-    <Modal open={open} onClose={onClose} title={`Stats — ${drama.title}`} width={520}>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:10, marginBottom:20 }}>
-        {[
-          { label:'Total Views', value:drama.views, color:'var(--accent2)' },
-          { label:'Watch Time', value:drama.watchTime, color:'var(--green)' },
-          { label:'Coin Unlocks', value:(drama.unlocks||0).toLocaleString(), color:'var(--amber)' },
-          { label:'Rating', value:drama.rating_avg ? `${drama.rating_avg} ★` : '—', color:'var(--pink)' },
-        ].map(m => (
-          <div key={m.label} style={{ background:'var(--bg3)', borderRadius:8, padding:14, textAlign:'center' }}>
-            <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6 }}>{m.label}</div>
-            <div style={{ fontSize:16, fontWeight:700, color:m.color, fontFamily:'var(--mono)' }}>{m.value}</div>
-          </div>
-        ))}
-      </div>
-      <ModalSection title="Episode performance">
-        {drama.episodes?.length === 0 && <div style={{ color:'var(--text3)', fontSize:13 }}>No episodes yet.</div>}
-        {drama.episodes?.map(ep => {
-          const maxV = drama.episodes[0]?.views || 1
-          return (
-            <div key={ep.id} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-              <div style={{ fontSize:11, color:'var(--text3)', width:80, flexShrink:0 }}>Ep {ep.ep} {ep.is_free?'':'🔒'}</div>
-              <div style={{ flex:1, height:6, background:'var(--bg4)', borderRadius:3, overflow:'hidden' }}>
-                <div style={{ height:'100%', width:`${(ep.views/maxV)*100}%`, background:'var(--accent)', borderRadius:3 }}/>
+    <Modal open={open} onClose={onClose} title={`Stats — ${drama.title}`} width={560}>
+      {loading ? (
+        <div style={{ textAlign:'center', padding:'30px 0', color:'var(--text3)', fontSize:13 }}>Loading stats…</div>
+      ) : !stats ? (
+        <div style={{ textAlign:'center', padding:'30px 0', color:'var(--text3)', fontSize:13 }}>Could not load stats.</div>
+      ) : (
+        <>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:10, marginBottom:20 }}>
+            {[
+              { label:'Total Views',      value:(stats.totalViews||0).toLocaleString(),      color:'var(--accent2)' },
+              { label:'Episode Unlocks',  value:(stats.totalUnlocks||0).toLocaleString(),     color:'var(--amber)'  },
+              { label:'Coins Generated',  value:`₵ ${(stats.totalCoinsSpent||0).toLocaleString()}`, color:'var(--green)'  },
+              { label:'Users Unlocked',   value:(stats.uniqueUnlockers||0).toLocaleString(),  color:'var(--blue)'   },
+            ].map(m => (
+              <div key={m.label} style={{ background:'var(--bg3)', borderRadius:8, padding:14, textAlign:'center' }}>
+                <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6 }}>{m.label}</div>
+                <div style={{ fontSize:16, fontWeight:700, color:m.color, fontFamily:'var(--mono)' }}>{m.value}</div>
               </div>
-              <div style={{ fontSize:11, fontFamily:'var(--mono)', color:'var(--text2)', width:50, textAlign:'right' }}>{(ep.views/1000).toFixed(0)}K</div>
-            </div>
-          )
-        })}
-      </ModalSection>
+            ))}
+          </div>
+
+          <ModalSection title="Episode Performance">
+            {stats.episodes?.length === 0 && (
+              <div style={{ color:'var(--text3)', fontSize:13 }}>No episodes yet.</div>
+            )}
+            {stats.episodes?.length > 0 && (
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                <thead>
+                  <tr style={{ borderBottom:'1px solid var(--border)' }}>
+                    <th style={{ textAlign:'left', padding:'6px 8px', color:'var(--text3)', fontWeight:500 }}>Episode</th>
+                    <th style={{ textAlign:'center', padding:'6px 8px', color:'var(--text3)', fontWeight:500 }}>Users Unlocked</th>
+                    <th style={{ textAlign:'right', padding:'6px 8px', color:'var(--text3)', fontWeight:500 }}>Coins Spent</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.episodes.map(ep => (
+                    <tr key={ep.id} style={{ borderBottom:'1px solid var(--border)' }}>
+                      <td style={{ padding:'8px', color:'var(--text2)' }}>
+                        Ep {ep.episode_num}{ep.title ? ` — ${ep.title}` : ''} {ep.is_free ? '' : '🔒'}
+                      </td>
+                      <td style={{ padding:'8px', textAlign:'center', fontFamily:'var(--mono)', color:'var(--text)' }}>
+                        {ep.unlocks.toLocaleString()}
+                      </td>
+                      <td style={{ padding:'8px', textAlign:'right', fontFamily:'var(--mono)', color:'var(--amber)' }}>
+                        ₵ {ep.coins_spent.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </ModalSection>
+        </>
+      )}
     </Modal>
   )
 }

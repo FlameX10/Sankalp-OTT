@@ -1327,3 +1327,85 @@ export async function adjustShowViewCount(req, res, next) {
     next(error);
   }
 }
+
+/**
+ * GET /api/v1/admin/shows/:showId/stats
+ * Returns show-level stats + per-episode breakdown for the stats modal
+ */
+export async function getShowStats(req, res, next) {
+  try {
+    const { showId } = req.params;
+
+    const show = await prisma.show.findUnique({
+      where: { id: showId },
+      select: {
+        id: true,
+        title: true,
+        view_count: true,
+        manual_view_count: true,
+        episodes: { select: { id: true, episode_num: true, title: true, is_free: true } },
+      },
+    });
+    if (!show) {
+      throw new AppError('Show not found', 404);
+    }
+
+    const episodeIds = show.episodes.map(e => e.id);
+
+    // All episode access rows for this show in one query
+    const accessRows = episodeIds.length > 0
+      ? await prisma.episodeAccess.groupBy({
+          by: ['episode_id'],
+          where: { episode_id: { in: episodeIds } },
+          _count: { user_id: true },
+          _sum: { coins_spent: true },
+        })
+      : [];
+
+    // Build episodeId -> { unlocks, coinsSpent } map
+    const accessMap = {};
+    for (const row of accessRows) {
+      accessMap[row.episode_id] = {
+        unlocks: row._count.user_id,
+        coinsSpent: row._sum.coins_spent || 0,
+      };
+    }
+
+    // Total unlock records across the whole show
+    const uniqueUnlockers = episodeIds.length > 0
+      ? await prisma.episodeAccess.count({
+          where: { episode_id: { in: episodeIds } },
+        })
+      : 0;
+
+    // Totals
+    const totalUnlocks = accessRows.reduce((sum, r) => sum + r._count.user_id, 0);
+    const totalCoinsSpent = accessRows.reduce((sum, r) => sum + (r._sum.coins_spent || 0), 0);
+    const totalViews = (show.view_count || 0) + (show.manual_view_count || 0);
+
+    // Per-episode breakdown sorted by episode_num
+    const episodes = show.episodes
+      .sort((a, b) => a.episode_num - b.episode_num)
+      .map(ep => ({
+        id: ep.id,
+        episode_num: ep.episode_num,
+        title: ep.title,
+        is_free: ep.is_free,
+        unlocks: accessMap[ep.id]?.unlocks || 0,
+        coins_spent: accessMap[ep.id]?.coinsSpent || 0,
+      }));
+
+    return res.json(
+      new ApiResponse(200, {
+        showId,
+        totalViews,
+        totalUnlocks,
+        totalCoinsSpent,
+        uniqueUnlockers,
+        episodes,
+      }, 'Show stats fetched successfully')
+    );
+  } catch (error) {
+    next(error);
+  }
+}

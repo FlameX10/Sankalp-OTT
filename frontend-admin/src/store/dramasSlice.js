@@ -86,6 +86,8 @@ export const loadDramas = createAsyncThunk(
             const epRes = await episodesApi.getByShow(show.id)
             return {
               ...show,
+              view_count: show.view_count || 0,
+              unlocks: show.unlock_count || 0,
               episodes: (epRes.data || []).map((ep) => ({
                 id:        ep.id,
                 title:     ep.title,

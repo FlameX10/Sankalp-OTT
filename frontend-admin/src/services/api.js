@@ -194,6 +194,7 @@ export const tagsApi = {
 
 // ── Shows (Dramas) ──
 export const showsApi = {
+  getStats: (showId) => api.get(`/v1/admin/shows/${showId}/stats`),
   getAll: (params) => api.get('/content/shows', { params }),
   getById: (id) => api.get(`/content/shows/${id}`),
   create: (data) => api.post('/content/shows', data),

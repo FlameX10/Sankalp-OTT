@@ -129,30 +129,51 @@ async function getAllShows({
         category: { select: { id: true, name: true } },
         show_tags: { include: { tag: { select: { id: true, name: true } } } },
         _count: { select: { episodes: true } },
+        episodes: { select: { id: true } }, // needed to count unlocks
       },
     }),
     prisma.show.count({ where }),
   ]);
 
+  // Batch-fetch unlock counts for all shows in one query
+  const allEpisodeIds = shows.flatMap(s => s.episodes.map(e => e.id));
+  const unlockCounts = allEpisodeIds.length > 0
+    ? await prisma.episodeAccess.groupBy({
+        by: ['episode_id'],
+        where: { episode_id: { in: allEpisodeIds } },
+        _count: { episode_id: true },
+      })
+    : [];
+
+  // Build episodeId -> unlock count map
+  const unlockMap = {};
+  for (const row of unlockCounts) {
+    unlockMap[row.episode_id] = row._count.episode_id;
+  }
+
   // Transform to flat format the frontend expects
-  const items = shows.map((s) => ({
-    id: s.id,
-    title: s.title,
-    synopsis: s.synopsis,
-    category: s.category.name,
-    category_id: s.category.id,
-    status: s.is_active ? 'Published' : 'Draft',
-    tags: s.show_tags.map((st) => st.tag.name),
-    tag_ids: s.show_tags.map((st) => st.tag.id),
-    view_count: displayedViewCount(s),
-    rating_avg: s.rating_avg,
-    rating_count: s.rating_count,
-    feed_position: s.feed_position,
-    thumbnail_url: s.thumbnail_url,
-    banner_url: s.banner_url,
-    episode_count: s._count.episodes,
-    created_at: s.created_at,
-  }));
+  const items = shows.map((s) => {
+    const unlock_count = s.episodes.reduce((sum, ep) => sum + (unlockMap[ep.id] || 0), 0);
+    return {
+      id: s.id,
+      title: s.title,
+      synopsis: s.synopsis,
+      category: s.category.name,
+      category_id: s.category.id,
+      status: s.is_active ? 'Published' : 'Draft',
+      tags: s.show_tags.map((st) => st.tag.name),
+      tag_ids: s.show_tags.map((st) => st.tag.id),
+      view_count: displayedViewCount(s),
+      unlock_count,
+      rating_avg: s.rating_avg,
+      rating_count: s.rating_count,
+      feed_position: s.feed_position,
+      thumbnail_url: s.thumbnail_url,
+      banner_url: s.banner_url,
+      episode_count: s._count.episodes,
+      created_at: s.created_at,
+    };
+  });
 
   return { items, total, page, limit };
 }

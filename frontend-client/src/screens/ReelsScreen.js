@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -11,6 +11,7 @@ import {
   TextInput,
   ScrollView,
   ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import CoinIcon from '../components/CoinIcon';
 import DramaDetailsSheetConnected from '../components/DramaDetailsSheetConnected';
 import { ROUTES } from '../constants/routes';
+import { theme } from '../constants/theme';
 import { clearPendingHomeBanner } from '../redux/slices/promoFlowSlice';
 import { API_BASE_URL } from '../constants/config';
 import { initShowPlayer } from '../redux/slices/showPlayerSlice';
@@ -77,6 +79,10 @@ export default function PopularScreen() {
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [allTags, setAllTags] = useState([]);
+  const [headerHeight, setHeaderHeight] = useState(0);
   const [selected, setSelected] = useState(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [sheetInitialTab, setSheetInitialTab] = useState('synopsis');
@@ -130,6 +136,58 @@ export default function PopularScreen() {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadTags() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/content/tags`);
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : [];
+        if (!cancelled) {
+          setAllTags(
+            list
+              .filter((tag) => tag?.name)
+              .sort((a, b) => a.name.localeCompare(b.name))
+          );
+        }
+      } catch (e) {
+        console.error('Tags Load Error:', e);
+        if (!cancelled) setAllTags([]);
+      }
+    }
+    loadTags();
+    return () => { cancelled = true; };
+  }, []);
+
+  const effectiveSearch = useMemo(() => {
+    if (selectedTags.length > 0) return selectedTags.join(' ');
+    return searchQuery.trim();
+  }, [selectedTags, searchQuery]);
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery('');
+    setSelectedTags([]);
+    setSearchFocused(false);
+  }, []);
+
+  const removeTag = useCallback((tagName) => {
+    setSelectedTags((prev) => prev.filter((tag) => tag !== tagName));
+  }, []);
+
+  const handleSearchTextChange = useCallback((text) => {
+    setSearchQuery(text);
+    if (text.trim()) setSelectedTags([]);
+  }, []);
+
+  const toggleTag = useCallback((tagName) => {
+    setSelectedTags((prev) => (
+      prev.includes(tagName)
+        ? prev.filter((tag) => tag !== tagName)
+        : [...prev, tagName]
+    ));
+    setSearchQuery('');
+  }, []);
+
   const loadShows = useCallback(async () => {
     setLoading(true);
     try {
@@ -138,7 +196,7 @@ export default function PopularScreen() {
       if (activeTab) params.set('category_id', activeTab);
       params.set('page', '1');
       params.set('limit', '60');
-      if (searchQuery.trim()) params.set('search', searchQuery.trim());
+      if (effectiveSearch) params.set('search', effectiveSearch);
 
       const res = await fetch(`${API_BASE_URL}/api/content/shows?${params.toString()}`);
       const data = await res.json();
@@ -150,7 +208,7 @@ export default function PopularScreen() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, searchQuery]);
+  }, [activeTab, effectiveSearch]);
 
   useEffect(() => {
     loadShows();
@@ -298,20 +356,87 @@ export default function PopularScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" />
 
-      <View style={styles.header}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color="#666" style={{ marginRight: 8 }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search dramas or tags..."
-            placeholderTextColor="#666"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={18} color="#666" />
-            </TouchableOpacity>
+      <View
+        style={styles.header}
+        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
+      >
+        <View style={styles.searchColumn}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={18} color="#666" style={styles.searchIcon} />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.searchInnerScroll}
+              contentContainerStyle={styles.searchInnerContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              {selectedTags.map((tag) => (
+                <View key={tag} style={styles.searchTagChip}>
+                  <Text style={styles.searchTagChipText} numberOfLines={1}>
+                    {tag}
+                  </Text>
+                  <TouchableOpacity onPress={() => removeTag(tag)} hitSlop={6}>
+                    <Ionicons name="close" size={11} color={theme.white} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <TextInput
+                style={[
+                  styles.searchInput,
+                  selectedTags.length > 0 && styles.searchInputCompact,
+                ]}
+                placeholder={selectedTags.length > 0 ? '' : 'Search dramas or tags...'}
+                placeholderTextColor="#666"
+                value={searchQuery}
+                onChangeText={handleSearchTextChange}
+                onFocus={() => setSearchFocused(true)}
+              />
+            </ScrollView>
+            {(selectedTags.length > 0 || searchQuery.length > 0) && (
+              <TouchableOpacity onPress={clearSearch} hitSlop={8}>
+                <Ionicons name="close-circle" size={18} color="#666" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {searchFocused && (
+            <View style={styles.tagDropdown}>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
+                style={styles.tagDropdownScroll}
+              >
+                <View style={styles.tagSearchWrap}>
+                  {allTags.length === 0 ? (
+                    <Text style={styles.tagSearchEmpty}>No tags available</Text>
+                  ) : (
+                    allTags.map((tag) => {
+                      const isSelected = selectedTags.includes(tag.name);
+                      return (
+                        <TouchableOpacity
+                          key={tag.id}
+                          style={[
+                            styles.tagSearchItem,
+                            isSelected && styles.tagSearchItemActive,
+                          ]}
+                          onPress={() => toggleTag(tag.name)}
+                        >
+                          <Text
+                            style={[
+                              styles.tagSearchItemText,
+                              isSelected && styles.tagSearchItemTextActive,
+                            ]}
+                          >
+                            {tag.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+                </View>
+              </ScrollView>
+            </View>
           )}
         </View>
 
@@ -331,6 +456,13 @@ export default function PopularScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {searchFocused && (
+        <Pressable
+          style={[styles.tagSearchBackdrop, { top: headerHeight }]}
+          onPress={() => setSearchFocused(false)}
+        />
+      )}
 
       <View style={styles.tabContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
@@ -382,10 +514,121 @@ export default function PopularScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 12 },
-  searchBar: { flex: 1, height: 40, backgroundColor: '#1A1A1A', borderRadius: 20, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
-  searchInput: { flex: 1, color: '#FFF', fontSize: 14, height: '100%', padding: 0 },
-  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 15 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 12,
+    zIndex: 110,
+  },
+  searchColumn: {
+    flex: 1,
+    zIndex: 111,
+  },
+  searchBar: {
+    height: 40,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 12,
+    paddingRight: 8,
+  },
+  searchIcon: {
+    marginRight: 6,
+  },
+  searchInnerScroll: {
+    flex: 1,
+  },
+  searchInnerContent: {
+    alignItems: 'center',
+    flexGrow: 1,
+    paddingRight: 4,
+  },
+  searchInput: {
+    flexGrow: 1,
+    minWidth: 120,
+    color: '#FFF',
+    fontSize: 14,
+    height: 40,
+    padding: 0,
+  },
+  searchInputCompact: {
+    minWidth: 48,
+    flexGrow: 0,
+  },
+  searchTagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: theme.crimson,
+    borderRadius: 14,
+    paddingLeft: 10,
+    paddingRight: 6,
+    paddingVertical: 5,
+    marginRight: 6,
+    maxWidth: 140,
+  },
+  searchTagChipText: {
+    color: theme.white,
+    fontSize: 12,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  tagDropdown: {
+    paddingTop: 6,
+    paddingBottom: 2,
+    backgroundColor: 'transparent',
+  },
+  tagDropdownScroll: {
+    maxHeight: 200,
+  },
+  tagSearchBackdrop: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 100,
+  },
+  tagSearchWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tagSearchItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  tagSearchItemActive: {
+    backgroundColor: 'rgba(255, 45, 85, 0.9)',
+    borderColor: theme.crimson,
+  },
+  tagSearchItemText: {
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  tagSearchItemTextActive: {
+    color: theme.white,
+  },
+  tagSearchEmpty: {
+    color: theme.gray,
+    fontSize: 13,
+    paddingVertical: 8,
+  },
+  headerIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+    height: 40,
+    paddingTop: 2,
+  },
   tabContainer: { paddingHorizontal: 16, paddingVertical: 15 },
   tabScrollContent: { flexDirection: 'row', gap: 20 },
   tabText: { color: '#999', fontSize: 16, fontWeight: '600' },

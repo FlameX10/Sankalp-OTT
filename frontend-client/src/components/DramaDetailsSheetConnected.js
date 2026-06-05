@@ -31,7 +31,10 @@ const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const SHEET_HEIGHT = Math.round(SCREEN_HEIGHT * 0.9);
 const EPISODE_GAP = 6;
 const EPISODES_PER_PAGE = 30;
-const RELATED_CARD_WIDTH = Math.floor((SCREEN_WIDTH - 32 - 24) / 3);
+const SHEET_HORIZONTAL_PADDING = 16;
+const RELATED_GAP = 8;
+const RELATED_CARD_WIDTH =
+  (SCREEN_WIDTH - SHEET_HORIZONTAL_PADDING * 2 - RELATED_GAP * 2) / 3;
 const RELATED_LIMIT = 6;
 
 function resolveThumbnailUrl(url) {
@@ -172,6 +175,14 @@ export default function DramaDetailsSheetConnected({
       cancelled = true;
     };
   }, [visible, item?.show_id]);
+
+  const relatedRows = useMemo(() => {
+    const rows = [];
+    for (let i = 0; i < relatedShows.length; i += 3) {
+      rows.push(relatedShows.slice(i, i + 3));
+    }
+    return rows;
+  }, [relatedShows]);
 
   // Move useMemo BEFORE the early return
   const posterSource = useMemo(() => {
@@ -368,17 +379,21 @@ export default function DramaDetailsSheetConnected({
 
             {(relatedLoading || relatedShows.length > 0) && tags.length > 0 ? (
               <View style={styles.relatedSection}>
-                <Text style={styles.sectionTitle}>More like this</Text>
+                <Text style={styles.sectionTitle}>Recommendations</Text>
                 {relatedLoading ? (
                   <ActivityIndicator size="small" color={theme.white} style={styles.relatedLoader} />
                 ) : (
                   <View style={styles.relatedGrid}>
-                    {relatedShows.map((drama) => (
-                      <RelatedDramaCard
-                        key={drama.id}
-                        drama={drama}
-                        onPress={() => onRelatedPress && onRelatedPress(drama)}
-                      />
+                    {relatedRows.map((row, rowIndex) => (
+                      <View key={`related-row-${rowIndex}`} style={styles.relatedRow}>
+                        {row.map((drama) => (
+                          <RelatedDramaCard
+                            key={drama.id}
+                            drama={drama}
+                            onPress={() => onRelatedPress && onRelatedPress(drama)}
+                          />
+                        ))}
+                      </View>
                     ))}
                   </View>
                 )}
@@ -608,9 +623,11 @@ const styles = StyleSheet.create({
     marginVertical: 16,
   },
   relatedGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 12,
+  },
+  relatedRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   relatedCard: {
     width: RELATED_CARD_WIDTH,

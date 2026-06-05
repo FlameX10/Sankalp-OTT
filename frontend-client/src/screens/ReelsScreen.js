@@ -24,6 +24,7 @@ import { ROUTES } from '../constants/routes';
 import { theme } from '../constants/theme';
 import { clearPendingHomeBanner } from '../redux/slices/promoFlowSlice';
 import { API_BASE_URL } from '../constants/config';
+import { createAuthenticatedApi } from '../services/api';
 import { initShowPlayer } from '../redux/slices/showPlayerSlice';
 import {
   clearHomeDramaSheetSession,
@@ -39,6 +40,9 @@ function selectPendingHomeBanner(state) {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const COLUMN_WIDTH = (SCREEN_WIDTH - 32) / 3;
+const feedApi = createAuthenticatedApi({
+  baseURL: API_BASE_URL,
+});
 
 function formatViews(viewCount) {
   if (typeof viewCount !== 'number' || Number.isNaN(viewCount)) return '0';
@@ -239,19 +243,18 @@ export default function PopularScreen() {
     setShowDetailsLoading(true);
     setShowDetailsError(null);
     try {
-      const headers = { 'Content-Type': 'application/json' };
-      if (accessToken) {
-        headers.Authorization = `Bearer ${accessToken}`;
-      }
-      const res = await fetch(`${API_BASE_URL}/api/feed/show/${showId}?from_ep=${fromEp}&limit=30`, {
-        headers,
+      const res = await feedApi.get(`/api/feed/show/${showId}`, {
+        params: { from_ep: fromEp, limit: 30 },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || `Failed to load episodes: ${res.status}`);
-      setShowDetails(data);
+      setShowDetails(res.data);
     } catch (e) {
       setShowDetails(null);
-      setShowDetailsError(e?.message || 'Failed to load episodes');
+      setShowDetailsError(
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e?.message ||
+        'Failed to load episodes'
+      );
     } finally {
       setShowDetailsLoading(false);
     }

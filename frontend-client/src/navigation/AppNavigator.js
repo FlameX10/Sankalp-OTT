@@ -4,12 +4,18 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BottomTabNavigator from './BottomTabNavigator';
 import ShowPlayerScreen from '../screens/ShowPlayerScreen';
 import { ROUTES } from '../constants/routes';
+import { theme } from '../constants/theme';
 
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: theme.deepBlack }, // FIX: prevent white flash
+      }}
+    >
       <Stack.Screen name={ROUTES.MAIN_TABS} component={BottomTabNavigator} />
       <Stack.Screen
         name={ROUTES.SHOW_PLAYER}

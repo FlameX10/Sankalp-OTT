@@ -12,9 +12,21 @@ import { theme } from '../constants/theme';
 
 const Stack = createNativeStackNavigator();
 
+// FIX: contentStyle added to every screen (and as a screenOptions default) so
+// the navigator background never flashes white before the screen's first paint.
+const DARK_HEADER = {
+  headerShown: true,
+  headerStyle: { backgroundColor: theme.deepBlack },
+  headerTintColor: theme.white,
+  headerShadowVisible: false,
+  contentStyle: { backgroundColor: theme.deepBlack },
+};
+
 export default function ProfileStackNavigator() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={{ contentStyle: { backgroundColor: theme.deepBlack } }}
+    >
       <Stack.Screen
         name={ROUTES.PROFILE}
         component={ProfileScreen}
@@ -23,59 +35,28 @@ export default function ProfileStackNavigator() {
       <Stack.Screen
         name={ROUTES.MEMBERSHIP}
         component={MembershipScreen}
-        options={{
-          title: 'Membership',
-          headerShown: true,
-          headerStyle: { backgroundColor: theme.deepBlack },
-          headerTintColor: theme.white,
-          headerShadowVisible: false,
-        }}
+        options={{ ...DARK_HEADER, title: 'Membership' }}
       />
       <Stack.Screen
         name={ROUTES.MY_WALLET}
         component={MyWallet}
-        options={{
-          title: 'My Wallet',
-          headerShown: true,
-          headerStyle: { backgroundColor: theme.deepBlack },
-          headerTintColor: theme.white,
-          headerShadowVisible: false,
-        }}
+        options={{ ...DARK_HEADER, title: 'My Wallet' }}
       />
       <Stack.Screen
         name={ROUTES.TOP_UP}
         component={TopUpScreen}
-        options={{
-          title: 'Top Up',
-          headerShown: true,
-          headerStyle: { backgroundColor: theme.deepBlack },
-          headerTintColor: theme.white,
-          headerShadowVisible: false,
-        }}
+        options={{ ...DARK_HEADER, title: 'Top Up' }}
       />
       <Stack.Screen
         name={ROUTES.TRANSACTION_HISTORY}
         component={TransactionHistoryScreen}
-        options={{
-          title: 'Transaction History',
-          headerShown: true,
-          headerStyle: { backgroundColor: theme.deepBlack },
-          headerTintColor: theme.white,
-          headerShadowVisible: false,
-        }}
+        options={{ ...DARK_HEADER, title: 'Transaction History' }}
       />
       <Stack.Screen
         name={ROUTES.EARN_REWARDS}
         component={EarnRewardsScreen}
-        options={{
-          title: 'Earn Rewards',
-          headerShown: true,
-          headerStyle: { backgroundColor: theme.deepBlack },
-          headerTintColor: theme.white,
-          headerShadowVisible: false,
-        }}
+        options={{ ...DARK_HEADER, title: 'Earn Rewards' }}
       />
     </Stack.Navigator>
   );
 }
-

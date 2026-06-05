@@ -1,14 +1,8 @@
-import axios from 'axios';
-
 import { API_BASE_URL } from '../../constants/config';
-import * as authService from '../../services/authService';
+import { createAuthenticatedApi } from '../../services/api';
 
-export const userApi = axios.create({
+export const userApi = createAuthenticatedApi({
   baseURL: `${API_BASE_URL}/api/user`,
-  headers: {
-    'Content-Type': 'application/json',
-    'x-client-type': authService.getClientType(),
-  },
 });
 
 export const authHeader = (token) =>

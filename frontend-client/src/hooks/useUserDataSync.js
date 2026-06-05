@@ -1,10 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import axios from 'axios';
-import { API_BASE_URL } from '../constants/config';
 import { patchUserProfile } from '../redux/slices/authSlice';
 import * as authService from '../services/authService';
+import { api } from '../services/api';
 
 const SYNC_INTERVAL = 200000; // Sync every 200 seconds (only when app is active)
 
@@ -44,10 +43,7 @@ export function useUserDataSync() {
 
     const syncUserData = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/v1/auth/me`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+        const response = await api.get('/auth/me', {
           timeout: 5000,
         });
 

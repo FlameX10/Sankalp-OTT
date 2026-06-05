@@ -11,19 +11,22 @@ import {
   clearResendRateLimit 
 } from '../../utils/otp.js';
 import { sendOtpEmail } from '../../config/email.js';
+import config from '../../config/index.js'; // FIX: import shared config
 
 const prisma = getPrismaClient();
 
-// JWT configuration
+// FIX: JWT_CONFIG now reads from the same config/index.js that auth.middleware.js uses.
+// Previously this file had its own hardcoded fallback secrets that differed from
+// utils/jwt.js, causing every token to fail verification when JWT_SECRET was not set.
 const JWT_CONFIG = {
   access: {
-    secret: process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production-abc123xyz',
-    expiresIn: '15m'
+    secret: config.jwtSecret,
+    expiresIn: config.jwtAccessTtl ? `${config.jwtAccessTtl}s` : '1h',
   },
   refresh: {
-    secret: process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret-change-in-production-789def',
-    expiresIn: '7d'
-  }
+    secret: config.jwtRefreshSecret,
+    expiresIn: config.jwtRefreshTtl ? `${config.jwtRefreshTtl}s` : '7d',
+  },
 };
 
 /**

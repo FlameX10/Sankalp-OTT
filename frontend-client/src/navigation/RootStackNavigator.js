@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -7,23 +7,23 @@ import AuthWrapper from '../components/AuthWrapper';
 import { ROUTES } from '../constants/routes';
 import { API_BASE_URL } from '../constants/config';
 import { useUserDataSync } from '../hooks/useUserDataSync';
+import { theme } from '../constants/theme';
 import {
   clearShowPlayer,
   fetchShowPlayerPage,
   initShowPlayer,
 } from '../redux/slices/showPlayerSlice';
 
-// ---------------------------------------------------------------------------
-// The two URL prefixes we accept:
-//   • https://ott.ventagenie.com  — production universal / app link
-//   • 7k://                       — custom scheme fallback (dev testing)
-//
-// IMPORTANT: ShowPlayer is intentionally NOT listed in the LINKING config.
-// React Navigation's built-in LINKING would try to navigate to ShowPlayer
-// before Redux state (episodes, showId) is populated, causing a blank
-// loading screen. Instead, handleDeepLink (below) manually fetches Redux
-// state first, then navigates — so only tab routes live in LINKING.
-// ---------------------------------------------------------------------------
+// FIX: override NavigationContainer's default white background at the root level
+// so no white flash appears during cold start or screen transitions
+const NAV_THEME = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: theme.deepBlack,
+  },
+};
+
 const LINKING = {
   prefixes: ['https://ott.ventagenie.com', '7k://'],
   config: {
@@ -36,7 +36,6 @@ const LINKING = {
           [ROUTES.PROFILE]: 'profile',
         },
       },
-      // ShowPlayer is NOT listed here — handled manually by handleDeepLink
     },
   },
 };
@@ -48,15 +47,8 @@ export default function RootStackNavigator() {
   const pendingDeepLink = useRef(null);
   const [navReady, setNavReady] = useState(false);
 
-  // Sync user data (coins, plan, etc.) periodically from backend
-  // This enables real-time updates when admin adjusts coins
   useUserDataSync();
 
-  // -------------------------------------------------------------------------
-  // Process deep link after navigation is ready
-  // Fetches Redux state then navigates so ShowPlayerScreen always has
-  // episodes ready when it mounts.
-  // -------------------------------------------------------------------------
   const processDeepLink = useCallback(
     (showId, episodeNum) => {
       if (!accessToken) {
@@ -113,11 +105,6 @@ export default function RootStackNavigator() {
     [dispatch, accessToken]
   );
 
-  // -------------------------------------------------------------------------
-  // Deep link handler
-  // Called by AuthWrapper for both cold-start (getInitialURL) and warm-start
-  // (Linking event) URLs. Queues the deep link if navigation isn't ready yet.
-  // -------------------------------------------------------------------------
   const handleDeepLink = useCallback(
     ({ url }) => {
       console.log('🔗 handleDeepLink called with:', url);
@@ -143,7 +130,7 @@ export default function RootStackNavigator() {
       }
 
       pendingDeepLink.current = { showId, episodeNum };
-      
+
       if (!navReady) {
         console.log('⏳ Navigation not ready, queuing deep link');
         return;
@@ -154,7 +141,6 @@ export default function RootStackNavigator() {
     [navReady, processDeepLink]
   );
 
-  // Process queued deep link when navigation becomes ready
   useEffect(() => {
     if (navReady && pendingDeepLink.current) {
       console.log('✅ Navigation ready, processing queued deep link');
@@ -169,11 +155,12 @@ export default function RootStackNavigator() {
       <NavigationContainer
         ref={navigationRef}
         linking={LINKING}
+        theme={NAV_THEME}
         onReady={() => {
           console.log('✅ Navigation ready');
           setNavReady(true);
         }}
-        onUnhandledAction={() => {}} // silence unhandled action warnings
+        onUnhandledAction={() => {}}
       >
         <AuthWrapper onDeepLink={handleDeepLink} />
       </NavigationContainer>

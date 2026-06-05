@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
-import axios from 'axios';
 
 import DailyCheckinPopup from '../rewards/DailyCheckinPopup';
 import DramaBannerPopup from '../home/DramaBannerPopup';
@@ -37,9 +36,9 @@ import {
 } from './promoFlowStorage';
 import { setPendingHomeBanner } from '../../redux/slices/promoFlowSlice';
 import { patchUserProfile, setCoins } from '../../redux/slices/authSlice';
-import { API_BASE_URL } from '../../constants/config';
 import { ROUTES } from '../../constants/routes';
 import * as authService from '../../services/authService';
+import { api } from '../../services/api';
 
 const MODAL_SETTLE_MS = 120;
 
@@ -99,8 +98,7 @@ export default function PromoFlowGate({ children }) {
   const refreshMembershipProfile = useCallback(async () => {
     if (!accessToken) return { plan, membership };
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/v1/auth/me`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      const res = await api.get('/auth/me', {
         timeout: 5000,
       });
       const user = res.data?.data;

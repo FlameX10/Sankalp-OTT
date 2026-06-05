@@ -1,25 +1,16 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
-import axios from 'axios';
 import { API_BASE_URL } from '../../constants/config';
 import { setCoins } from './authSlice';
 import { unlockEpisodeInForYou } from './reelsSlice';
 import * as authService from '../../services/authService';
+import { createAuthenticatedApi } from '../../services/api';
 
-const feedApi = axios.create({
+const feedApi = createAuthenticatedApi({
   baseURL: API_BASE_URL,
-  headers: { 'Content-Type': 'application/json' },
   timeout: 15000,
 });
 
-let _store = null;
-export const setShowPlayerStore = (store) => { _store = store; };
-feedApi.interceptors.request.use((config) => {
-  if (_store) {
-    const token = _store.getState().auth?.accessToken;
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+export const setShowPlayerStore = () => {};
 
 const PLAYER_PAGE_SIZE = 30;
 

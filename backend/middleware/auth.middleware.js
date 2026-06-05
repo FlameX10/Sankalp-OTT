@@ -28,10 +28,6 @@ const baseAuth = async (req, allowGuest = false) => {
   try {
     decoded = verifyAccessToken(token);
   } catch {
-    if (allowGuest) {
-      req.isGuest = true;
-      return;
-    }
     throw new ApiError(401, 'Invalid or expired token');
   }
 

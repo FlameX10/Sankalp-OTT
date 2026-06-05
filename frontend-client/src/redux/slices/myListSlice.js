@@ -1,14 +1,13 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
 import { API_BASE_URL } from '../../constants/config';
+import { createAuthenticatedApi } from '../../services/api';
 
 // ─────────────────────────────────────────────────────────────────
 // Axios instance pointing at /api/user (not /api/v1)
 // Token is injected per-request from the thunk using getState
 // ─────────────────────────────────────────────────────────────────
-const userApi = axios.create({
+const userApi = createAuthenticatedApi({
   baseURL: `${API_BASE_URL}/api/user`,
-  headers: { 'Content-Type': 'application/json' },
 });
 
 // Helper to build auth header

@@ -1,26 +1,16 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
-import axios from 'axios';
 import { API_BASE_URL } from '../../constants/config';
+import { createAuthenticatedApi } from '../../services/api';
 
 // Feed API uses /api/feed/... (no /v1 prefix)
 // Auth API uses /api/v1/auth/... (with /v1)
 // So we create a separate instance for feed calls
-const feedApi = axios.create({
+const feedApi = createAuthenticatedApi({
   baseURL: API_BASE_URL,
-  headers: { 'Content-Type': 'application/json' },
   timeout: 15000,
 });
 
-// Inject auth token if available
-let _store = null;
-export const setFeedStore = (store) => { _store = store; };
-feedApi.interceptors.request.use((config) => {
-  if (_store) {
-    const token = _store.getState().auth?.accessToken;
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+export const setFeedStore = () => {};
 
 const PAGE_SIZE = 10;
 

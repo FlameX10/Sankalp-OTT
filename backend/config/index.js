@@ -12,7 +12,7 @@ export default {
   // JWT
   jwtSecret: process.env.JWT_SECRET,
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
-  jwtAccessTtl: parseInt(process.env.JWT_ACCESS_TTL) || 900,
+  jwtAccessTtl: parseInt(process.env.JWT_ACCESS_TTL) || 3600,
   jwtRefreshTtl: parseInt(process.env.JWT_REFRESH_TTL) || 2592000,
 
   // MinIO

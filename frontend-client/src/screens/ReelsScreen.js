@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -12,6 +12,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Pressable,
+  Keyboard,
 } from 'react-native';
 import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -84,9 +85,12 @@ export default function PopularScreen() {
   const isFocused = useIsFocused();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState([]);
-  const [searchFocused, setSearchFocused] = useState(false);
+  const [searchInputFocused, setSearchInputFocused] = useState(false);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [allTags, setAllTags] = useState([]);
   const [headerHeight, setHeaderHeight] = useState(0);
+  const searchInputRef = useRef(null);
+  const filterPanelOpenRef = useRef(false);
   const [selected, setSelected] = useState(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [sheetInitialTab, setSheetInitialTab] = useState('synopsis');
@@ -168,19 +172,51 @@ export default function PopularScreen() {
     return searchQuery.trim();
   }, [selectedTags, searchQuery]);
 
+  useEffect(() => {
+    filterPanelOpenRef.current = filterPanelOpen;
+  }, [filterPanelOpen]);
+
+  const showFilterButton = searchInputFocused
+    || filterPanelOpen
+    || selectedTags.length > 0
+    || searchQuery.length > 0;
+
   const clearSearch = useCallback(() => {
     setSearchQuery('');
     setSelectedTags([]);
-    setSearchFocused(false);
-  }, []);
-
-  const removeTag = useCallback((tagName) => {
-    setSelectedTags((prev) => prev.filter((tag) => tag !== tagName));
+    setSearchInputFocused(false);
+    setFilterPanelOpen(false);
+    searchInputRef.current?.blur();
+    Keyboard.dismiss();
   }, []);
 
   const handleSearchTextChange = useCallback((text) => {
     setSearchQuery(text);
     if (text.trim()) setSelectedTags([]);
+  }, []);
+
+  const handleSearchFocus = useCallback(() => {
+    setSearchInputFocused(true);
+    setFilterPanelOpen(false);
+  }, []);
+
+  const handleSearchBlur = useCallback(() => {
+    setTimeout(() => {
+      if (!filterPanelOpenRef.current) {
+        setSearchInputFocused(false);
+      }
+    }, 200);
+  }, []);
+
+  const handleFilterPress = useCallback(() => {
+    Keyboard.dismiss();
+    searchInputRef.current?.blur();
+    setSearchInputFocused(false);
+    setFilterPanelOpen((open) => !open);
+  }, []);
+
+  const closeFilterPanel = useCallback(() => {
+    setFilterPanelOpen(false);
   }, []);
 
   const toggleTag = useCallback((tagName) => {
@@ -364,51 +400,56 @@ export default function PopularScreen() {
         onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
       >
         <View style={styles.searchColumn}>
-          <View style={styles.searchBar}>
-            <Ionicons name="search" size={18} color="#666" style={styles.searchIcon} />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.searchInnerScroll}
-              contentContainerStyle={styles.searchInnerContent}
-              keyboardShouldPersistTaps="handled"
-            >
-              {selectedTags.map((tag) => (
-                <View key={tag} style={styles.searchTagChip}>
-                  <Text style={styles.searchTagChipText} numberOfLines={1}>
-                    {tag}
-                  </Text>
-                  <TouchableOpacity onPress={() => removeTag(tag)} hitSlop={6}>
-                    <Ionicons name="close" size={11} color={theme.white} />
-                  </TouchableOpacity>
-                </View>
-              ))}
+          <View style={styles.searchRow}>
+            <View style={[styles.searchBar, showFilterButton && styles.searchBarWithFilter]}>
+              <Ionicons name="search" size={18} color="#666" style={styles.searchIcon} />
               <TextInput
-                style={[
-                  styles.searchInput,
-                  selectedTags.length > 0 && styles.searchInputCompact,
-                ]}
-                placeholder={selectedTags.length > 0 ? '' : 'Search dramas or tags...'}
+                ref={searchInputRef}
+                style={styles.searchInput}
+                placeholder="Search dramas or tags..."
                 placeholderTextColor="#666"
                 value={searchQuery}
                 onChangeText={handleSearchTextChange}
-                onFocus={() => setSearchFocused(true)}
+                onFocus={handleSearchFocus}
+                onBlur={handleSearchBlur}
               />
-            </ScrollView>
-            {(selectedTags.length > 0 || searchQuery.length > 0) && (
-              <TouchableOpacity onPress={clearSearch} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color="#666" />
+              {(selectedTags.length > 0 || searchQuery.length > 0) && (
+                <TouchableOpacity onPress={clearSearch} hitSlop={8}>
+                  <Ionicons name="close-circle" size={18} color="#666" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {showFilterButton && (
+              <TouchableOpacity
+                style={[
+                  styles.filterButton,
+                  (filterPanelOpen || selectedTags.length > 0) && styles.filterButtonActive,
+                ]}
+                onPress={handleFilterPress}
+                hitSlop={6}
+              >
+                <Ionicons
+                  name="funnel-outline"
+                  size={18}
+                  color={selectedTags.length > 0 || filterPanelOpen ? theme.crimson : '#AAA'}
+                />
+                {selectedTags.length > 0 && (
+                  <View style={styles.filterBadge}>
+                    <Text style={styles.filterBadgeText}>{selectedTags.length}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             )}
           </View>
 
-          {searchFocused && (
-            <View style={styles.tagDropdown}>
+          {filterPanelOpen && (
+            <View style={styles.tagFilterPanel}>
               <ScrollView
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
                 nestedScrollEnabled
-                style={styles.tagDropdownScroll}
+                style={styles.tagFilterScroll}
               >
                 <View style={styles.tagSearchWrap}>
                   {allTags.length === 0 ? (
@@ -460,11 +501,15 @@ export default function PopularScreen() {
         </View>
       </View>
 
-      {searchFocused && (
+      {filterPanelOpen && (
         <Pressable
           style={[styles.tagSearchBackdrop, { top: headerHeight }]}
-          onPress={() => setSearchFocused(false)}
-        />
+          onPress={closeFilterPanel}
+        >
+          <Text style={styles.tapHintText}>
+            Tap anywhere to apply filters
+          </Text>
+        </Pressable>
       )}
 
       <View style={styles.tabContainer}>
@@ -529,7 +574,13 @@ const styles = StyleSheet.create({
     flex: 1,
     zIndex: 111,
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   searchBar: {
+    flex: 1,
     height: 40,
     backgroundColor: '#1A1A1A',
     borderRadius: 20,
@@ -538,62 +589,70 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
     paddingRight: 8,
   },
+  searchBarWithFilter: {
+    flex: 1,
+  },
   searchIcon: {
     marginRight: 6,
   },
-  searchInnerScroll: {
-    flex: 1,
-  },
-  searchInnerContent: {
-    alignItems: 'center',
-    flexGrow: 1,
-    paddingRight: 4,
-  },
   searchInput: {
-    flexGrow: 1,
-    minWidth: 120,
+    flex: 1,
     color: '#FFF',
     fontSize: 14,
     height: 40,
     padding: 0,
   },
-  searchInputCompact: {
-    minWidth: 48,
-    flexGrow: 0,
-  },
-  searchTagChip: {
-    flexDirection: 'row',
+  filterButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#1A1A1A',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  filterButtonActive: {
+    borderColor: theme.crimson,
+    backgroundColor: 'rgba(255, 45, 85, 0.12)',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: theme.crimson,
-    borderRadius: 14,
-    paddingLeft: 10,
-    paddingRight: 6,
-    paddingVertical: 5,
-    marginRight: 6,
-    maxWidth: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
   },
-  searchTagChipText: {
+  filterBadgeText: {
     color: theme.white,
-    fontSize: 12,
-    fontWeight: '700',
-    flexShrink: 1,
+    fontSize: 10,
+    fontWeight: '800',
   },
-  tagDropdown: {
-    paddingTop: 6,
+  tagFilterPanel: {
+    paddingTop: 8,
     paddingBottom: 2,
     backgroundColor: 'transparent',
   },
-  tagDropdownScroll: {
-    maxHeight: 200,
+  tagFilterScroll: {
+    maxHeight: 220,
   },
   tagSearchBackdrop: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  
     zIndex: 100,
+  
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   tagSearchWrap: {
     flexDirection: 'row',
@@ -649,4 +708,15 @@ const styles = StyleSheet.create({
   categoryText: { color: '#666', fontSize: 11, marginTop: 4 },
   loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyText: { color: '#666', textAlign: 'center', marginTop: 50, fontSize: 16 },
+  
+  tapHintText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+  
+    overflow: 'hidden',
+  },
 });

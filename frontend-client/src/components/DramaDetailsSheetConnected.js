@@ -33,8 +33,7 @@ const EPISODE_GAP = 6;
 const EPISODES_PER_PAGE = 30;
 const SHEET_HORIZONTAL_PADDING = 16;
 const RELATED_GAP = 8;
-const RELATED_CARD_WIDTH =
-  (SCREEN_WIDTH - SHEET_HORIZONTAL_PADDING * 2 - RELATED_GAP * 2) / 3;
+const RELATED_CARD_WIDTH = '31%' ;
 const RELATED_LIMIT = 6;
 
 function resolveThumbnailUrl(url) {
@@ -71,16 +70,28 @@ function buildRanges(totalEpisodes) {
   return ranges;
 }
 
-function RelatedDramaCard({ drama, onPress }) {
+function RelatedDramaCard({ drama, onPress, style }) {
   const uri = resolveThumbnailUrl(drama.thumbnail_url);
+
   return (
-    <Pressable style={styles.relatedCard} onPress={onPress}>
+    <Pressable
+      style={[styles.relatedCard, style]}
+      onPress={onPress}
+    >
       {uri ? (
-        <Image source={{ uri }} style={styles.relatedPoster} resizeMode="cover" />
+        <Image
+          source={{ uri }}
+          style={styles.relatedPoster}
+          resizeMode="cover"
+        />
       ) : (
         <View style={[styles.relatedPoster, styles.posterFallback]} />
       )}
-      <Text style={styles.relatedTitle} numberOfLines={2}>
+
+      <Text
+        style={styles.relatedTitle}
+        numberOfLines={2}
+      >
         {drama.title}
       </Text>
     </Pressable>
@@ -175,14 +186,6 @@ export default function DramaDetailsSheetConnected({
       cancelled = true;
     };
   }, [visible, item?.show_id]);
-
-  const relatedRows = useMemo(() => {
-    const rows = [];
-    for (let i = 0; i < relatedShows.length; i += 3) {
-      rows.push(relatedShows.slice(i, i + 3));
-    }
-    return rows;
-  }, [relatedShows]);
 
   // Move useMemo BEFORE the early return
   const posterSource = useMemo(() => {
@@ -384,17 +387,20 @@ export default function DramaDetailsSheetConnected({
                   <ActivityIndicator size="small" color={theme.white} style={styles.relatedLoader} />
                 ) : (
                   <View style={styles.relatedGrid}>
-                    {relatedRows.map((row, rowIndex) => (
-                      <View key={`related-row-${rowIndex}`} style={styles.relatedRow}>
-                        {row.map((drama) => (
-                          <RelatedDramaCard
-                            key={drama.id}
-                            drama={drama}
-                            onPress={() => onRelatedPress && onRelatedPress(drama)}
-                          />
-                        ))}
-                      </View>
-                    ))}
+                    {relatedShows.map((drama, index) => {
+                      const isThirdColumn = (index + 1) % 3 === 0;
+
+                      return (
+                        <RelatedDramaCard
+                          key={drama.id}
+                          drama={drama}
+                          style={{
+                            marginRight: isThirdColumn ? 0 : RELATED_GAP,
+                          }}
+                          onPress={() => onRelatedPress?.(drama)}
+                        />
+                      );
+                    })}
                   </View>
                 )}
               </View>
@@ -623,14 +629,13 @@ const styles = StyleSheet.create({
     marginVertical: 16,
   },
   relatedGrid: {
-    gap: 12,
-  },
-  relatedRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
   },
   relatedCard: {
     width: RELATED_CARD_WIDTH,
+    marginBottom: RELATED_GAP,
   },
   relatedPoster: {
     width: '100%',

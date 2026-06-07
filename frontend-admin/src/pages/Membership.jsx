@@ -153,7 +153,8 @@ export default function Membership() {
       'User': h.user,
       'Plan': h.plan,
       'Amount': `₹${Math.round(h.amount)}`,
-      'Date': new Date(h.date).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }),
+      'Start Date': h.startDate ? new Date(h.startDate).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : new Date(h.date).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }),
+      'End Date': h.endDate ? new Date(h.endDate).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '—',
       'Status': h.status === 'ACTIVE' ? 'Active' : 'Expired',
     }))
 
@@ -318,22 +319,41 @@ export default function Membership() {
           </div>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>User</th><th>Plan</th><th>Amount</th><th>Date</th><th>Status</th></tr></thead>
+              <thead><tr><th>User</th><th>Plan</th><th>Amount</th><th>Start Date</th><th>End Date</th><th>Status</th></tr></thead>
               <tbody>
                 {historyLoading ? (
-                  <tr><td colSpan="5" style={{ textAlign:'center', color:'var(--text3)', padding:'20px' }}>Loading...</td></tr>
+                  <tr><td colSpan="6" style={{ textAlign:'center', color:'var(--text3)', padding:'20px' }}>Loading...</td></tr>
                 ) : history.length === 0 ? (
-                  <tr><td colSpan="5" style={{ textAlign:'center', color:'var(--text3)', padding:'20px' }}>No subscription history</td></tr>
+                  <tr><td colSpan="6" style={{ textAlign:'center', color:'var(--text3)', padding:'20px' }}>No subscription history</td></tr>
                 ) : (
-                  history.map(h => (
-                    <tr key={h.id}>
-                      <td style={{ fontWeight:500 }}>{h.user}</td>
-                      <td><span className={`badge ${h.plan==='Annual'?'badge-blue':h.plan==='Monthly'?'badge-purple':'badge-green'}`}>{h.plan}</span></td>
-                      <td style={{ fontFamily:'var(--mono)' }}>₹{Math.round(h.amount).toLocaleString()}</td>
-                      <td style={{ color:'var(--text3)', fontSize:12 }}>{new Date(h.date).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' })}</td>
-                      <td><span className={`badge ${h.status==='ACTIVE'?'badge-green':'badge-red'}`}>{h.status === 'ACTIVE' ? 'Active' : 'Expired'}</span></td>
-                    </tr>
-                  ))
+                  (() => {
+                    const PLAN_COLORS = [
+                      { bg:'#1a3a2a', color:'#4ade80' },
+                      { bg:'#1a2a4a', color:'#60a5fa' },
+                      { bg:'#2e1a4a', color:'#c084fc' },
+                      { bg:'#3a2a10', color:'#fb923c' },
+                      { bg:'#3a1a2a', color:'#f472b6' },
+                      { bg:'#1a3a3a', color:'#34d399' },
+                      { bg:'#2a2a10', color:'#facc15' },
+                      { bg:'#1a2a2a', color:'#22d3ee' },
+                    ]
+                    const uniquePlans = [...new Set(history.map(h => h.plan))]
+                    const planColorMap = {}
+                    uniquePlans.forEach((plan, i) => { planColorMap[plan] = PLAN_COLORS[i % PLAN_COLORS.length] })
+                    return history.map(h => {
+                      const pc = planColorMap[h.plan]
+                      return (
+                        <tr key={h.id}>
+                          <td style={{ fontWeight:500 }}>{h.user}</td>
+                          <td><span style={{ background:pc.bg, color:pc.color, padding:'2px 10px', borderRadius:99, fontSize:11, fontWeight:600, letterSpacing:'0.03em', display:'inline-block' }}>{h.plan}</span></td>
+                          <td style={{ fontFamily:'var(--mono)' }}>₹{Math.round(h.amount).toLocaleString()}</td>
+                          <td style={{ color:'var(--text3)', fontSize:12 }}>{h.startDate ? new Date(h.startDate).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : new Date(h.date).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' })}</td>
+                          <td style={{ color:'var(--text3)', fontSize:12 }}>{h.endDate ? new Date(h.endDate).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '—'}</td>
+                          <td><span className={`badge ${h.status==='ACTIVE'?'badge-green':'badge-red'}`}>{h.status === 'ACTIVE' ? 'Active' : 'Expired'}</span></td>
+                        </tr>
+                      )
+                    })
+                  })()
                 )}
               </tbody>
             </table>

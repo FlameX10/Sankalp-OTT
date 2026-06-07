@@ -1,51 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Search, Download, RefreshCw, Plus, Minus, AlertCircle, Loader } from 'lucide-react'
+import { Search, Download, RefreshCw, AlertCircle, Loader } from 'lucide-react'
 import Modal, { FormGroup, ModalSection } from '../components/ui/Modal.jsx'
-import { coinsApi, usersApi } from '../services/api.js'
+import { coinsApi } from '../services/api.js'
 
 const METHODS = ['All', 'Purchase', 'Daily Checkin', 'Spend', 'Manual', 'Refund']
-
-function ManualAdjustModal({ open, onClose, onSave }) {
-  const [form, setForm] = useState({ user:'', amount:'', type:'credit', reason:'' })
-  const [loading, setLoading] = useState(false)
-  const upd = (k,v) => setForm(p=>({...p,[k]:v}))
-  
-  if(!open) return null
-  
-  const handle = async () => {
-    if (!form.user || !form.amount) return
-    setLoading(true)
-    try {
-      await onSave(form)
-      onClose()
-      setForm({ user:'', amount:'', type:'credit', reason:'' })
-    } finally {
-      setLoading(false)
-    }
-  }
-  
-  return (
-    <Modal open={open} onClose={onClose} title="Manual Coin Adjustment" width={440}
-      footer={<><button className="btn btn-ghost" onClick={onClose}>Cancel</button><button className={`btn ${form.type==='credit'?'btn-primary':'btn-danger'}`} disabled={loading} onClick={handle}>{loading?<>Saving...</>: form.type==='credit'?'Credit Coins':'Debit Coins'}</button></>}
-    >
-      <FormGroup label="User (name or ID)">
-        <input className="input" style={{ width:'100%' }} placeholder="e.g. Priya Raj or U001" value={form.user} onChange={e=>upd('user',e.target.value)}/>
-      </FormGroup>
-      <FormGroup label="Operation">
-        <div style={{ display:'flex', gap:8 }}>
-          <button className={`btn ${form.type==='credit'?'btn-primary':'btn-ghost'}`} style={{ flex:1 }} onClick={() => upd('type','credit')}><Plus size={13}/> Credit</button>
-          <button className={`btn ${form.type==='debit'?'btn-danger':'btn-ghost'}`} style={{ flex:1 }} onClick={() => upd('type','debit')}><Minus size={13}/> Debit</button>
-        </div>
-      </FormGroup>
-      <FormGroup label="Amount (₵)">
-        <input className="input" style={{ width:'100%' }} type="number" min={1} placeholder="Enter coin amount" value={form.amount} onChange={e=>upd('amount',e.target.value)}/>
-      </FormGroup>
-      <FormGroup label="Reason / note">
-        <input className="input" style={{ width:'100%' }} placeholder="e.g. Compensation for service issue" value={form.reason} onChange={e=>upd('reason',e.target.value)}/>
-      </FormGroup>
-    </Modal>
-  )
-}
 
 function RefundModal({ open, onClose }) {
   if(!open) return null
@@ -137,31 +95,6 @@ export default function Coins() {
     }
   }
 
-  const handleManual = async (form) => {
-    // Find user by name or ID
-    try {
-      const usersRes = await usersApi.getAll()
-      const user = usersRes.data?.data?.users?.find(u => 
-        u.name.toLowerCase().includes(form.user.toLowerCase()) || 
-        u.id.toLowerCase().includes(form.user.toLowerCase())
-      )
-      
-      if (!user) {
-        alert('User not found')
-        return
-      }
-
-      const amount = form.type === 'credit' ? +form.amount : -+form.amount
-      await usersApi.adjustCoins(user.id, amount, form.reason || 'Manual adjustment')
-      
-      // Reload data
-      loadData()
-    } catch (err) {
-      console.error('Error adjusting coins:', err)
-      alert('Failed to adjust coins: ' + (err.response?.data?.message || err.message))
-    }
-  }
-
   const filteredTxns = txns.filter(t => {
     const meth = filter==='All' || t.method===filter
     const match = t.user.toLowerCase().includes(q.toLowerCase()) || t.type.toLowerCase().includes(q.toLowerCase())
@@ -241,10 +174,7 @@ export default function Coins() {
               <span className="coin-pill" style={{ color:r.color }}>₵ {r.val}</span>
             </div>
           ))}
-          <div style={{ display:'flex', gap:8, marginTop:16 }}>
-            <button className="btn btn-primary btn-sm" style={{ flex:1 }} onClick={() => setModal('manual')}><Plus size={12}/> Manual credit/debit</button>
-            <button className="btn btn-ghost btn-sm" style={{ flex:1 }} onClick={() => setModal('refund')}><RefreshCw size={12}/> Refund purchase</button>
-          </div>
+
         </div>
       </div>
 
@@ -296,7 +226,6 @@ export default function Coins() {
         </div>
       </div>
 
-      <ManualAdjustModal open={modal==='manual'} onClose={() => setModal(null)} onSave={handleManual}/>
       <RefundModal open={modal==='refund'} onClose={() => setModal(null)}/>
     </div>
   )

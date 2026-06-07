@@ -36,7 +36,6 @@ export default function Notifications() {
 
   const charLimit = 160
 
-  // Fetch dramas on component mount
   useEffect(() => {
     fetchStats()
     fetchSentNotifications()
@@ -88,7 +87,6 @@ export default function Notifications() {
 
       const response = await api.post('/v1/notifications/admin/send', payload)
       if (response.data?.success) {
-        // Add to sent list
         const newNotif = {
           id: Date.now(),
           title: title || notifType,
@@ -98,7 +96,6 @@ export default function Notifications() {
           recipients: response.data.data.count || 0,
         }
         setSent(p => [newNotif, ...p])
-        // Clear form
         setMsg('')
         setTitle('')
         setTab('sent')
@@ -144,12 +141,10 @@ export default function Notifications() {
   return (
     <div className="page-enter">
       {/* Stats row */}
-      <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 16 }}>
+      <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(2,1fr)', marginBottom: 16 }}>
         {[
-          { label: 'Total sent', value: stats?.totalSent || sent.length, sub: 'notifications' },
-          { label: 'Avg delivery', value: '43.6K', sub: 'per notification' },
-          { label: 'Avg open rate', value: stats?.openRate || '62%', sub: 'opened / delivered' },
-          { label: 'Scheduled', value: scheduled.length, sub: 'pending notifications' },
+          { label: 'Total sent to users', value: stats?.totalSent || sent.length, sub: 'notifications' },
+          { label: 'Total notifications sent', value: sent.length, sub: 'notifications' },
         ].map(m => (
           <div className="metric-card" key={m.label}>
             <div className="metric-label">{m.label}</div>
@@ -201,10 +196,6 @@ export default function Notifications() {
               </div>
             </div>
 
-
-
-
-
             <div className="form-group">
               <label className="form-label">Custom title (optional)</label>
               <input className="input" style={{ width: '100%' }} placeholder="Leave blank to use type as title" value={title} onChange={e => setTitle(e.target.value)} />
@@ -218,8 +209,6 @@ export default function Notifications() {
               <textarea className="input" rows={4} style={{ width: '100%', resize: 'vertical' }}
                 placeholder="Write your notification message…" value={msg} onChange={e => setMsg(e.target.value)} />
             </div>
-
-
 
             <button className="btn btn-primary" onClick={sendNow} disabled={!msg.trim() || loading}>
               {loading ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : 'Send now'}
@@ -239,21 +228,6 @@ export default function Notifications() {
               </div>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{title || NOTIF_TYPES.find(t => t.value === notifType)?.label || 'Notification title'}</div>
               <div style={{ fontSize: 12, color: 'var(--text2)' }}>{msg || 'Your notification message will appear here…'}</div>
-
-            </div>
-            <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>Estimated reach</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {[
-                  { label: 'Target', value: audience === 'All users' ? '48,291 users' : audience === 'Free users' ? '30,450 users' : '17,841 users' },
-                  { label: 'Est. opens', value: audience === 'All users' ? '~29,940' : audience === 'Free users' ? '~18,879' : '~11,062' },
-                ].map(r => (
-                  <div key={r.label} style={{ background: 'var(--bg3)', padding: 10, borderRadius: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 3 }}>{r.label}</div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{r.value}</div>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </div>
@@ -292,8 +266,6 @@ export default function Notifications() {
           )}
         </div>
       )}
-
-
 
       <ConfirmDialog open={!!confirm} danger
         title={confirm?.type === 'scheduled' ? 'Cancel Scheduled Notification' : 'Delete Sent Notification'}

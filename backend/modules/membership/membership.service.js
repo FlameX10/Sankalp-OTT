@@ -354,6 +354,8 @@ export async function getSubscriptionHistory(page = 1, limit = 50) {
       amount: m.payment?.amount ? parseFloat(m.payment.amount) : parseFloat(m.plan.price),
       currency: m.plan.currency,
       date: m.payment?.created_at || m.created_at,
+      startDate: m.start_date,
+      endDate: m.end_date,
       status: m.status,
       txnId: m.payment?.id || m.id,
     }));

@@ -180,7 +180,7 @@ export default function Categories() {
               <div style={{ fontSize:10, color:'var(--text3)', fontFamily:'var(--mono)', width:20, textAlign:'center' }}>{c.displayOrder}</div>
               <div style={{ flex:1 }}>
                 <div style={{ fontWeight:500, fontSize:13 }}>{c.name}</div>
-                <div style={{ fontSize:11, color:'var(--text3)' }}>{c.dramas} dramas</div>
+
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:1 }}>

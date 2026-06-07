@@ -340,7 +340,7 @@ export default function Users() {
         <div className="table-wrap">
           <table>
             <thead>
-              <tr><th>User</th><th>Email</th><th>Role</th><th>User Type</th><th>Membership End Date</th><th>Coins</th><th>Joined</th><th>Status</th><th>Actions</th></tr>
+              <tr><th>User</th><th>Email</th><th>Role</th><th>User Type</th><th>Membership End Date</th><th>Coins</th><th>Joined</th><th>Activity Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
               {[...filtered].sort((a, b) => {

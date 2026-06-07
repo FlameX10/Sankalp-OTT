@@ -352,19 +352,6 @@ export const initiateRegistration = async (userData) => {
   try {
     const { name, email, password } = userData;
 
-    // Check if email already in RegistrationSession (user started signup)
-    const existingSession = await prisma.registrationSession.findUnique({
-      where: { email }
-    });
-
-    if (existingSession) {
-      if (new Date() > existingSession.expires_at) {
-        await prisma.registrationSession.delete({ where: { id: existingSession.id } });
-      } else {
-        throw new ApiError(409, 'Registration already in progress for this email. Check your inbox for OTP.');
-      }
-    }
-
     // Check if user already exists (completed registration)
     const existingUser = await prisma.user.findUnique({
       where: { email }
@@ -372,6 +359,24 @@ export const initiateRegistration = async (userData) => {
 
     if (existingUser) {
       throw new ApiError(409, 'Email already registered. Please login or use a different email.');
+    }
+
+    // Check if email already has an unfinished registration session.
+    const existingSession = await prisma.registrationSession.findUnique({
+      where: { email }
+    });
+    const hasActiveRegistrationSession =
+      existingSession && new Date() <= existingSession.expires_at;
+
+    let resendMeta = null;
+    if (hasActiveRegistrationSession) {
+      resendMeta = await checkResendRateLimit(email);
+      if (!resendMeta.allowed) {
+        throw new ApiError(429, resendMeta.error || 'Please wait before requesting a new OTP');
+      }
+    } else if (existingSession) {
+      await prisma.registrationSession.delete({ where: { id: existingSession.id } });
+      await prisma.otpToken.deleteMany({ where: { email } });
     }
 
     // Hash password temporarily (stored in session, not in User model yet)
@@ -383,15 +388,24 @@ export const initiateRegistration = async (userData) => {
 
     // Create registration session (expires in 24 hours)
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    
-    const session = await prisma.registrationSession.create({
-      data: {
-        email,
-        name,
-        password_hash: passwordHash,
-        expires_at: expiresAt
-      }
-    });
+
+    const session = hasActiveRegistrationSession
+      ? await prisma.registrationSession.update({
+          where: { id: existingSession.id },
+          data: {
+            name,
+            password_hash: passwordHash,
+            expires_at: expiresAt
+          }
+        })
+      : await prisma.registrationSession.create({
+          data: {
+            email,
+            name,
+            password_hash: passwordHash,
+            expires_at: expiresAt
+          }
+        });
 
     // Create OTP token (expires in 10 minutes)
     const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -433,7 +447,9 @@ export const initiateRegistration = async (userData) => {
       email: maskedEmail,
       originalEmail: email,
       expiresAt: expiresAt.toISOString(),
-      otpExpiresAt: otpExpiresAt.toISOString()
+      otpExpiresAt: otpExpiresAt.toISOString(),
+      nextResendAt: resendMeta?.nextResendAt?.toISOString?.(),
+      remainingResends: resendMeta?.remainingResends
     };
   } catch (error) {
     logger.error('Registration initiation failed', { error: error.message });

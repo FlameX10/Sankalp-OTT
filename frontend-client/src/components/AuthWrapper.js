@@ -8,7 +8,13 @@ import PromoFlowGate from './promo/PromoFlowGate';
 import SplashScreen from './SplashScreen';
 import { GuestAuthProvider } from '../context/GuestAuthContext';
 import { ROUTES } from '../constants/routes';
-import { initAuth } from '../redux/slices/authSlice';
+import {
+  clearOtpState,
+  clearRegisterState,
+  initAuth,
+  setPendingRegistration,
+} from '../redux/slices/authSlice';
+import * as authService from '../services/authService';
 
 export default function AuthWrapper({ onDeepLink }) {
   const dispatch = useDispatch();
@@ -69,8 +75,12 @@ export default function AuthWrapper({ onDeepLink }) {
   }, [onDeepLink]);
 
   const onGuestAccess = useCallback(() => {
+    authService.clearPendingRegistration();
+    dispatch(setPendingRegistration(null));
+    dispatch(clearRegisterState());
+    dispatch(clearOtpState());
     setGuestMode(true);
-  }, []);
+  }, [dispatch]);
 
   const openSignUp = useCallback(() => {
     setGuestMode(false);

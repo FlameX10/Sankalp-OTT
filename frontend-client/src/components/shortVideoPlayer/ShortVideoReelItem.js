@@ -65,6 +65,7 @@ export default function ShortVideoReelItem({
   onReturnToDramaSheet,
   walletReturnParams = null,
   showEpisodeStrip = true,
+  showViewsAction = false,
 }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -553,7 +554,7 @@ export default function ShortVideoReelItem({
           <View style={styles.sideActionsColumn}>
             <SideAction
               icon={isBookmarked ? 'bookmark' : 'bookmark-outline'}
-              label={item.view_count > 0 ? formatCount(item.view_count) : ''}
+              label=""
               color={isBookmarked ? shortVideoTheme.crimson : '#fff'}
               onPress={handleBookmarkPress}
             />
@@ -563,6 +564,12 @@ export default function ShortVideoReelItem({
               onPress={handleOpenEpisodesOrReturn}
             />
             <SideAction icon="share-social" label="Share" onPress={handleShare} />
+            {showViewsAction ? (
+              <SideAction
+                icon="eye-outline"
+                label={item.view_count > 0 ? formatCount(item.view_count) : ''}
+              />
+            ) : null}
           </View>
 
           <View style={styles.textContent}>

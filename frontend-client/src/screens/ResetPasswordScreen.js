@@ -81,7 +81,12 @@ export default function ResetPasswordScreen({ navigation, route }) {
       dispatch(clearPasswordResetState());
       navigation.reset({
         index: 0,
-        routes: [{ name: ROUTES.LOGIN }],
+        routes: [
+          {
+            name: ROUTES.LOGIN,
+            params: { passwordResetSuccess: true },
+          },
+        ],
       });
     }
   }, [dispatch, navigation, resetState.status]);

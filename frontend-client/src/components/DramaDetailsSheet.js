@@ -147,11 +147,6 @@ export default function DramaDetailsSheet({
                   {item.title}
                 </Text>
                 <Text style={styles.metaText}>{item.views} Views</Text>
-                <View style={styles.ratingRow}>
-                  <Ionicons name="star" size={14} color={theme.gold} />
-                  <Text style={styles.metaText}>4.8(20.1K)</Text>
-                  <Text style={styles.metaLink}>Rate {'>'}</Text>
-                </View>
               </View>
             </View>
             <Pressable onPress={onClose} hitSlop={15}>
@@ -246,45 +241,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   posterRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 14,
     flex: 1,
   },
   poster: {
-    width: 58,
-    height: 58,
-    borderRadius: 8,
+    width: 72,
+    height: 72,
+    borderRadius: 10,
     backgroundColor: theme.surface,
   },
   posterMeta: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   title: {
     color: theme.white,
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '800',
   },
   metaText: {
     color: theme.gray,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    marginTop: 2,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
     marginTop: 4,
-  },
-  metaLink: {
-    color: theme.white,
-    fontSize: 12,
-    fontWeight: '700',
-    marginLeft: 8,
   },
   tabsRow: {
     flexDirection: 'row',

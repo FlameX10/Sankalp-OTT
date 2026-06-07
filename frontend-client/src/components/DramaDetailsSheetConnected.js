@@ -229,18 +229,11 @@ export default function DramaDetailsSheetConnected({
   const currentEpisodes = showDetails?.episodes || [];
 
   const viewCountValue = showDetails?.view_count ?? item.view_count ?? null;
-  const ratingAvg = showDetails?.rating_avg ?? item.rating_avg ?? null;
-  const ratingCount = showDetails?.rating_count ?? item.rating_count ?? null;
-
   const viewsLabel = item.views
     ? `${item.views} Views`
     : viewCountValue !== null
       ? `${formatCount(viewCountValue)} Views`
       : null;
-
-  const ratingLabel = ratingAvg !== null && ratingCount !== null
-    ? `${Number(ratingAvg).toFixed(1)}(${formatCount(ratingCount)})`
-    : null;
 
   const handleRangePress = (rangeStart) => {
     setActiveRangeStart(rangeStart);
@@ -286,11 +279,6 @@ export default function DramaDetailsSheetConnected({
                 {viewsLabel ? (
                   <Text style={styles.metaText}>{viewsLabel}</Text>
                 ) : null}
-                <View style={styles.ratingRow}>
-                  <Ionicons name="star" size={14} color={theme.gold} />
-                  <Text style={styles.metaText}>{ratingLabel || 'Rate this drama'}</Text>
-                  <Text style={styles.metaLink}>Rate {'>'}</Text>
-                </View>
               </View>
             </View>
             <Pressable onPress={onClose} hitSlop={15}>
@@ -435,17 +423,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   posterRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 14,
     flex: 1,
   },
   poster: {
-    width: 58,
-    height: 58,
-    borderRadius: 8,
+    width: 90,
+    height: 110,
+    borderRadius: 10,
     backgroundColor: theme.surface,
   },
   posterFallback: {
@@ -454,30 +442,18 @@ const styles = StyleSheet.create({
   },
   posterMeta: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   title: {
     color: theme.white,
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '800',
   },
   metaText: {
     color: theme.gray,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    marginTop: 2,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
     marginTop: 4,
-  },
-  metaLink: {
-    color: theme.white,
-    fontSize: 12,
-    fontWeight: '700',
-    marginLeft: 8,
   },
   tabsRow: {
     flexDirection: 'row',

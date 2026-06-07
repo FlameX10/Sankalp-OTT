@@ -37,6 +37,7 @@ import {
   selectShowPlayerStartProgressSec,
 } from '../redux/slices/showPlayerSlice';
 import { upsertWatchHistory } from '../redux/slices/myListSlice';
+import { ROUTES } from '../constants/routes';
 
 const PLAYER_PAGE_SIZE = 30;
 
@@ -171,9 +172,16 @@ export default function ShowPlayerScreen({ navigation }) {
 
   const handleClose = useCallback(() => {
     dispatch(clearShowPlayer());
-    // Deep-link entries have no meaningful back destination — go to MainTabs
     if (fromDeepLink) {
-      navigation.navigate(ROUTES.MAIN_TABS);
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: ROUTES.MAIN_TABS,
+            params: { screen: ROUTES.HOME },
+          },
+        ],
+      });
     } else {
       navigation.goBack();
     }

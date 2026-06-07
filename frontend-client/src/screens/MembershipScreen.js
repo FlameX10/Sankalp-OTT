@@ -34,22 +34,6 @@ const BENEFITS = [
 
 ];
 
-function useCountdown() {
-  const [seconds, setSeconds] = useState(74097);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSeconds((s) => (s > 0 ? s - 1 : 0));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
-  const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-  const s = String(seconds % 60).padStart(2, '0');
-  return `${h}:${m}:${s}`;
-}
-
 export default function MembershipScreen({ navigation }) {
   const route = useRoute();
   const dispatch = useDispatch();
@@ -65,7 +49,6 @@ export default function MembershipScreen({ navigation }) {
   const [purchasing, setPurchasing] = useState(false);
   const [purchaseError, setPurchaseError] = useState(null);
 
-  const countdown = useCountdown();
   const isMember = userPlan === 'MEMBER' && membership?.end_date;
   const returningHomeRef = useRef(false);
 
@@ -274,12 +257,6 @@ export default function MembershipScreen({ navigation }) {
                   )}
                 </View>
               </View>
-              {selectedPlan === plan.id &&
-              (plan.duration === 'weekly' || plan.duration === 'week') ? (
-                <View style={styles.discountTag}>
-                  <Text style={styles.discountTagText}>Discount {countdown}</Text>
-                </View>
-              ) : null}
             </Pressable>
           ))}
         </View>
@@ -440,16 +417,6 @@ const styles = StyleSheet.create({
   planName: { color: theme.white, fontSize: 16, fontWeight: '700', marginBottom: 4 },
   planPrice: { color: theme.white, fontSize: 18, fontWeight: '800' },
   planDetail: { color: theme.gray, fontSize: 11, marginTop: 4, lineHeight: 16 },
-  discountTag: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: theme.crimson,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderBottomLeftRadius: 10,
-  },
-  discountTagText: { color: theme.white, fontSize: 11, fontWeight: '700' },
   whyTitle: {
     fontSize: 22,
     fontWeight: '800',

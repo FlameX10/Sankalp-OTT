@@ -391,6 +391,12 @@ const authSlice = createSlice({
     clearLogoutError(state) {
       state.logout.error = null;
     },
+    clearAuthError(state) {
+      state.error = null;
+      if (state.status === 'failed') {
+        state.status = 'idle';
+      }
+    },
     /**
      * Set tokens (used by interceptor after refresh)
      * Only updates accessToken in Redux
@@ -630,6 +636,7 @@ export const {
   clearPasswordResetState,
   clearLogoutState,
   clearLogoutError,
+  clearAuthError,
   setTokens,
   setCoins,
   setPlan,

@@ -14,12 +14,13 @@ import { ROUTES } from '../constants/routes';
 
 // ✅ REDUX IMPORTS
 import { useDispatch, useSelector } from 'react-redux';
-import { loginUser } from '../redux/slices/authSlice'; // adjust path if needed
+import { clearAuthError, loginUser } from '../redux/slices/authSlice'; // adjust path if needed
 
-export default function LoginScreen({ navigation, onGuestAccess }) {
+export default function LoginScreen({ navigation, route, onGuestAccess }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const passwordResetSuccess = !!route?.params?.passwordResetSuccess;
 
   // ✅ REDUX HOOKS
   const dispatch = useDispatch();
@@ -36,9 +37,18 @@ export default function LoginScreen({ navigation, onGuestAccess }) {
     }
   }, [accessToken, navigation, status]);
 
+  useEffect(() => {
+    if (passwordResetSuccess) {
+      dispatch(clearAuthError());
+    }
+  }, [dispatch, passwordResetSuccess]);
+
   // ✅ UPDATED LOGIN FUNCTION (NO NAVIGATION)
   const handleSignIn = async () => {
     try {
+      if (passwordResetSuccess) {
+        navigation.setParams({ passwordResetSuccess: false });
+      }
       await dispatch(loginUser({ email, password })).unwrap();
     } catch (err) {
       // ❌ error already handled in redux
@@ -126,8 +136,13 @@ export default function LoginScreen({ navigation, onGuestAccess }) {
       </Pressable>
 
       {/* ✅ ERROR DISPLAY */}
-      {error && (
-        <Text style={{ color: 'red', marginTop: 10, textAlign: 'center' }}>
+      {passwordResetSuccess && (
+        <Text style={styles.successText}>
+          Your password has been reset. Please sign in.
+        </Text>
+      )}
+      {!passwordResetSuccess && error && (
+        <Text style={styles.errorText}>
           {error}
         </Text>
       )}
@@ -258,6 +273,16 @@ const styles = StyleSheet.create({
     color: theme.white,
     fontSize: 17,
     fontWeight: '700',
+  },
+  successText: {
+    color: theme.green,
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  errorText: {
+    color: theme.red,
+    marginTop: 10,
+    textAlign: 'center',
   },
   bottomRow: {
     flexDirection: 'row',

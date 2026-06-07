@@ -315,6 +315,7 @@ export default function ForYouScreen() {
             }}
             showPlaybackSpeedControl
             showOttOverlayControls
+            showViewsAction
           />
         )}
         pagingEnabled

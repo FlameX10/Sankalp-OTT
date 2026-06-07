@@ -232,9 +232,6 @@ export default function ProfileScreen({ navigation }) {
 
       {!isPaid && (
         <View style={styles.memberBanner}>
-          <View style={styles.discountBadge}>
-            <Text style={styles.discountText}>16% off</Text>
-          </View>
           <View style={styles.bannerContent}>
             <View style={styles.bannerLeft}>
               <Text style={styles.bannerTitle}>Join Membership</Text>

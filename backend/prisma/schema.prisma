@@ -143,7 +143,7 @@ model UserMembership {
   status     MembershipStatus   @default(ACTIVE)
   created_at DateTime           @default(now())
 
-  user    User                @relation(fields: [user_id], references: [id])
+  user    User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
   plan    MembershipPlan      @relation(fields: [plan_id], references: [id])
   payment PaymentTransaction? @relation(fields: [payment_id], references: [id])
 
@@ -164,7 +164,7 @@ model PaymentTransaction {
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
-  user        User             @relation(fields: [user_id], references: [id])
+  user        User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
   memberships UserMembership[]
   coin_topups CoinTransaction[]
 
@@ -292,7 +292,7 @@ model WatchHistory {
   progress_sec Int      @default(0)
   last_watched DateTime @default(now())
 
-  user    User    @relation(fields: [user_id], references: [id])
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
   episode Episode @relation(fields: [episode_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, episode_id], name: "idx_wh_user_ep")
@@ -307,7 +307,7 @@ model EpisodeAccess {
   coins_spent Int
   unlocked_at DateTime @default(now())
 
-  user    User    @relation(fields: [user_id], references: [id])
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
   episode Episode @relation(fields: [episode_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, episode_id], name: "idx_ea_user_ep")
@@ -352,7 +352,7 @@ model CoinTransaction {
   status      String   @default("completed") @db.VarChar(20)
   created_at  DateTime @default(now())
 
-  user                User                 @relation(fields: [user_id], references: [id])
+  user                User                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
   payment_transaction PaymentTransaction?  @relation(fields: [payment_id], references: [id])
 
   @@index([user_id, created_at(sort: Desc)], name: "idx_ct_user_created")
@@ -367,7 +367,7 @@ model DailyCheckin {
   streak_day   Int
   created_at   DateTime @default(now())
 
-  user User @relation(fields: [user_id], references: [id])
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, checkin_date], name: "idx_dc_user_date")
   @@map("daily_checkins")
@@ -433,7 +433,7 @@ model Bookmark {
   progress_sec Int      @default(0)
   created_at   DateTime @default(now())
 
-  user    User    @relation(fields: [user_id], references: [id])
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
   show    Show    @relation(fields: [show_id], references: [id])
   episode Episode? @relation(fields: [episode_id], references: [id], onDelete: Cascade)
 
@@ -450,7 +450,7 @@ model Playlist {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  user  User           @relation(fields: [user_id], references: [id])
+  user  User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
   items PlaylistItem[]
 
   @@map("playlists")
@@ -480,7 +480,7 @@ model Rating {
   score      Int
   created_at DateTime @default(now())
 
-  user User @relation(fields: [user_id], references: [id])
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
   show Show @relation(fields: [show_id], references: [id])
 
   @@unique([user_id, show_id])
@@ -501,7 +501,7 @@ model NotificationLog {
   sent_at DateTime  @default(now())
   read_at DateTime?
 
-  user User? @relation(fields: [user_id], references: [id])
+  user User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
 
   @@map("notification_log")
 }
@@ -519,7 +519,7 @@ model AdminActivityLog {
   details     String?  @db.Text
   created_at  DateTime @default(now())
 
-  user User @relation(fields: [user_id], references: [id])
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("admin_activity_log")
 }

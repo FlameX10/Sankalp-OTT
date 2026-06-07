@@ -978,95 +978,116 @@ export async function getAnalyticsReport(req, res, next) {
     let reportData = [];
 
     if (reportType === 'subscription') {
+      // New subscriptions: memberships created within the period
       const newSubs = await prisma.userMembership.count({
         where: { created_at: { gte: startDate, lte: endDate } },
       });
 
-      const renewals = await prisma.userMembership.count({
-        where: { 
-          start_date: { gte: startDate, lte: endDate },
-          created_at: { lt: startDate },
-        },
+      // Renewals — derived from the purchase flow behaviour:
+      // When a user re-purchases, simulateMembershipPurchase:
+      //   1. Sets the old ACTIVE row to EXPIRED (same transaction)
+      //   2. Creates a new ACTIVE row (created_at is a few seconds later)
+      // So a renewal = a membership created in this period where the same user
+      // already has an EXPIRED row with a strictly earlier created_at.
+      // This works even when first-sub and renewal both fall within the same period.
+      const periodRows = await prisma.userMembership.findMany({
+        where: { created_at: { gte: startDate, lte: endDate } },
+        select: { id: true, user_id: true, created_at: true },
+        orderBy: { created_at: 'asc' },
       });
 
+      let renewals = 0;
+      if (periodRows.length > 0) {
+        const uniqueUserIds = [...new Set(periodRows.map(r => r.user_id))];
+
+        // For each unique user, find their earliest EXPIRED row
+        const expiredEarliestMap = {};
+        await Promise.all(
+          uniqueUserIds.map(async (uid) => {
+            const earliest = await prisma.userMembership.findFirst({
+              where: { user_id: uid, status: 'EXPIRED' },
+              orderBy: { created_at: 'asc' },
+              select: { created_at: true },
+            });
+            expiredEarliestMap[uid] = earliest?.created_at ?? null;
+          })
+        );
+
+        // A row is a renewal if the user has an EXPIRED row created before
+        // this row's own created_at — covers both cross-period and same-period renewals
+        renewals = periodRows.filter(row => {
+          const earliestExpired = expiredEarliestMap[row.user_id];
+          return earliestExpired !== null && earliestExpired < row.created_at;
+        }).length;
+      }
+
+      // Total membership revenue in period
       const totalRevenue = await prisma.paymentTransaction.aggregate({
         where: { 
           created_at: { gte: startDate, lte: endDate },
           status: 'completed',
+          type: 'membership',
         },
         _sum: { amount: true },
       });
 
-      const weeklyRev = await prisma.paymentTransaction.aggregate({
-        where: { 
-          created_at: { gte: startDate, lte: endDate },
-          status: 'completed',
-          type: 'weekly',
-        },
-        _sum: { amount: true },
-      });
+      const totalRevenueVal = parseFloat(totalRevenue._sum.amount || 0);
 
-      const monthlyRev = await prisma.paymentTransaction.aggregate({
-        where: { 
-          created_at: { gte: startDate, lte: endDate },
-          status: 'completed',
-          type: 'monthly',
-        },
-        _sum: { amount: true },
-      });
+      // Avg revenue per subscriber (ARPU) — total membership rev ÷ new subs in period
+      const arpu = newSubs > 0 ? totalRevenueVal / newSubs : 0;
 
-      const annualRev = await prisma.paymentTransaction.aggregate({
-        where: { 
-          created_at: { gte: startDate, lte: endDate },
-          status: 'completed',
-          type: 'annual',
-        },
-        _sum: { amount: true },
+      // Active memberships snapshot (current, not period-scoped — a live health number)
+      const activeMemberships = await prisma.userMembership.count({
+        where: { status: 'ACTIVE' },
       });
 
       reportData = [
         { lbl: 'New subscriptions', val: formatNumber(newSubs), color: 'var(--green)' },
         { lbl: 'Renewals', val: formatNumber(renewals), color: 'var(--text)' },
-        { lbl: 'Total revenue', val: formatCurrency(totalRevenue._sum.amount || 0), color: 'var(--accent2)' },
-        { lbl: 'Weekly plan rev.', val: formatCurrency(weeklyRev._sum.amount || 0), color: 'var(--text2)' },
-        { lbl: 'Monthly plan rev.', val: formatCurrency(monthlyRev._sum.amount || 0), color: 'var(--text2)' },
-        { lbl: 'Annual plan rev.', val: formatCurrency(annualRev._sum.amount || 0), color: 'var(--text2)' },
+        { lbl: 'Total revenue', val: formatCurrency(totalRevenueVal), color: 'var(--accent2)' },
+        { lbl: 'Avg. revenue per subscriber', val: formatCurrency(arpu), color: 'var(--text2)' },
+        { lbl: 'Active memberships', val: formatNumber(activeMemberships), color: 'var(--text2)' },
       ];
     } else if (reportType === 'coins') {
+      // Coins issued via daily check-in rewards in this period
+      // reason = 'daily_checkin' (set by daily-checkin.service.js)
       const issued = await prisma.coinTransaction.aggregate({
-        where: { 
+        where: {
           created_at: { gte: startDate, lte: endDate },
-          reason: 'gift',
+          reason: 'daily_checkin',
         },
         _sum: { amount: true },
       });
 
+      // Coins purchased via wallet top-up in this period
+      // reason = 'wallet_topup_simulated' (set by user.router.js topup flow)
       const purchased = await prisma.coinTransaction.aggregate({
-        where: { 
+        where: {
           created_at: { gte: startDate, lte: endDate },
-          reason: 'purchase',
+          reason: 'wallet_topup_simulated',
         },
         _sum: { amount: true },
       });
 
-      const spent = await prisma.coinTransaction.aggregate({
-        where: { 
-          created_at: { gte: startDate, lte: endDate },
-          type: 'debit',
-        },
-        _sum: { amount: true },
+      // Coins spent on episode unlocks in this period
+      // Source of truth: episodeAccess.coins_spent (same as dashboard)
+      // Avoids double-counting manual admin debits that also write coinTransaction rows
+      const spent = await prisma.episodeAccess.aggregate({
+        where: { unlocked_at: { gte: startDate, lte: endDate } },
+        _sum: { coins_spent: true },
       });
 
+      // Balance in wallets: current snapshot of all user coin balances
+      // Not period-scoped by design — it reflects the live state right now
       const balance = await prisma.user.aggregate({
-        where: { coins: { gt: 0 } },
         _sum: { coins: true },
       });
 
       reportData = [
-        { lbl: 'Coins issued (gift)', val: formatCoins(issued._sum.amount || 0), color: 'var(--green)' },
-        { lbl: 'Coins purchased', val: formatCoins(purchased._sum.amount || 0), color: 'var(--blue)' },
-        { lbl: 'Coins spent', val: formatCoins(spent._sum.amount || 0), color: 'var(--red)' },
-        { lbl: 'Balance in wallets', val: formatCoins(balance._sum.coins || 0), color: 'var(--amber)' },
+        { lbl: 'Coins issued (daily rewards)', val: formatCoins(issued._sum.amount || 0), color: 'var(--green)' },
+        { lbl: 'Coins purchased (top-ups)', val: formatCoins(purchased._sum.amount || 0), color: 'var(--blue)' },
+        { lbl: 'Coins spent (unlocks)', val: formatCoins(spent._sum.coins_spent || 0), color: 'var(--red)' },
+        { lbl: 'Balance in wallets (live)', val: formatCoins(balance._sum.coins || 0), color: 'var(--amber)' },
       ];
     } else if (reportType === 'users') {
       const newSignups = await prisma.user.count({
@@ -1111,9 +1132,16 @@ export async function getAnalyticsReport(req, res, next) {
       if (topEpisode.length > 0) {
         const ep = await prisma.episode.findUnique({
           where: { id: topEpisode[0].episode_id },
-          select: { title: true },
+          select: {
+            episode_num: true,
+            title: true,
+            show: { select: { title: true } },
+          },
         });
-        topEpisodeName = ep?.title || 'N/A';
+        if (ep) {
+          const showTitle = ep.show?.title || 'Unknown';
+          topEpisodeName = showTitle + ' · Ep.' + ep.episode_num;
+        }
       }
 
       reportData = [

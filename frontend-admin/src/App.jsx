@@ -1,11 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import './index.css'
 
-import { selectIsAuthenticated, selectUser, selectCanAccess, selectDefaultPage, setUser } from './store/authSlice'
+import { selectIsAuthenticated, selectUser, selectCanAccess, selectDefaultPage, setUser, logout } from './store/authSlice'
 import { selectActivePage, setActivePage } from './store/navigationSlice'
 import { canAccessPage } from './config/permissions.js'
-import { authApi } from './services/api.js'
+import { authApi, refreshAccessToken } from './services/api.js'
 
 import Layout        from './components/Layout.jsx'
 import Login         from './pages/Login.jsx'
@@ -57,11 +57,24 @@ export default function App() {
   const hasAccess         = useSelector(selectCanAccess(activePage))
   const defaultPage       = useSelector(selectDefaultPage)
 
-  // Refresh admin profile (role + sections) after page load / refresh
+  // authReady: false = still doing the initial silent token refresh, true = ready to render pages
+  const [authReady, setAuthReady] = useState(!isAuthenticated)
+
+  // On mount, if we have a stored session, proactively refresh the access token so it's
+  // valid before any page component fires its first API call. This eliminates the 401
+  // console errors that occur when the stored access token has expired but the refresh
+  // cookie is still valid.
   useEffect(() => {
-    if (!isAuthenticated) return
-    authApi
-      .getAdminProfile()
+    if (!isAuthenticated) {
+      setAuthReady(true)
+      return
+    }
+
+    refreshAccessToken()
+      .then(() => {
+        // Also refresh the admin profile so role/sections are up to date
+        return authApi.getAdminProfile()
+      })
       .then((res) => {
         const profile = res.data?.data
         if (profile) {
@@ -69,8 +82,23 @@ export default function App() {
           dispatch(setUser(profile))
         }
       })
-      .catch(() => {})
-  }, [isAuthenticated, dispatch])
+      .catch((err) => {
+        // Only force-logout when the refresh token is genuinely rejected (401/403).
+        // A 502/503/network error means the backend is temporarily unavailable — in that
+        // case keep the existing token and let the per-request interceptor retry later.
+        const status = err?.response?.status
+        if (status === 401 || status === 403) {
+          localStorage.removeItem('admin_token')
+          localStorage.removeItem('admin_user')
+          dispatch(logout())
+        }
+        // For any other error (502, timeout, offline) — fall through and render the app
+        // with whatever token is in localStorage; the axios interceptor handles retries.
+      })
+      .finally(() => {
+        setAuthReady(true)
+      })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps — intentionally runs once on mount
 
   // Redirect to first allowed page if current page is not permitted
   useEffect(() => {
@@ -82,6 +110,12 @@ export default function App() {
 
   if (!isAuthenticated) {
     return <Login />
+  }
+
+  // Hold render until the initial token refresh completes — prevents pages from firing
+  // API requests with a stale/expired access token
+  if (!authReady) {
+    return null
   }
 
   const Page = ROUTES[activePage] || Dashboard

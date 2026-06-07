@@ -35,8 +35,8 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-// Refresh token function
-const refreshAccessToken = () => {
+// Refresh token function — also exported so App.jsx can call it on mount
+export const refreshAccessToken = () => {
   return api.get('/v1/auth/refresh-token', {
     headers: { 'x-client-type': 'web' }
   }).then((response) => {

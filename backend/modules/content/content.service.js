@@ -1,6 +1,54 @@
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../middleware/error.middleware.js';
 import { displayedViewCount } from '../user/view-count.service.js';
+import minioClient from '../../config/minio.js';
+import config from '../../config/index.js';
+
+const MINIO_BUCKET = config.minio.bucket;
+
+/**
+ * Delete all MinIO objects under a given prefix by listing and batch-removing them.
+ * Silent on errors — MinIO cleanup is best-effort; DB delete still proceeds.
+ */
+async function deleteMinioPrefix(prefix) {
+  try {
+    const objectNames = await new Promise((resolve, reject) => {
+      const names = [];
+      const stream = minioClient.listObjectsV2(MINIO_BUCKET, prefix, true);
+      stream.on('data', (obj) => names.push(obj.name));
+      stream.on('end', () => resolve(names));
+      stream.on('error', reject);
+    });
+
+    if (objectNames.length === 0) return;
+
+    // minio-js removeObjects takes an array of { name } objects
+    await new Promise((resolve, reject) => {
+      const objectList = objectNames.map((name) => ({ name }));
+      minioClient.removeObjects(MINIO_BUCKET, objectList, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    console.log(`[MinIO] Deleted ${objectNames.length} object(s) under prefix "${prefix}"`);
+  } catch (err) {
+    // Log but do not throw — storage cleanup failure must not block the DB delete
+    console.error(`[MinIO] Failed to delete objects under prefix "${prefix}":`, err.message);
+  }
+}
+
+/**
+ * Delete a single MinIO object silently.
+ */
+async function deleteMinioObject(objectName) {
+  try {
+    await minioClient.removeObject(MINIO_BUCKET, objectName);
+    console.log(`[MinIO] Deleted object "${objectName}"`);
+  } catch (err) {
+    console.error(`[MinIO] Failed to delete object "${objectName}":`, err.message);
+  }
+}
 
 // ═══════════════════════════════════════
 // CATEGORIES
@@ -360,9 +408,31 @@ async function updateShow(id, data) {
 }
 
 async function deleteShow(id) {
-  const show = await prisma.show.findUnique({ where: { id } });
+  const show = await prisma.show.findUnique({
+    where: { id },
+    include: { episodes: { select: { id: true } } },
+  });
   if (!show) throw new AppError('Show not found', 404);
-  // Cascade deletes episodes, show_tags, etc.
+
+  // ── MinIO cleanup (best-effort, never blocks DB delete) ──
+  // 1. Delete all transcoded HLS files + thumbnails under dramas/{showId}/
+  await deleteMinioPrefix(`dramas/${id}/`);
+
+  // 2. Delete raw source videos for every episode: raw/{episodeId}/video.mp4
+  for (const ep of show.episodes) {
+    await deleteMinioObject(`raw/${ep.id}/video.mp4`);
+  }
+
+  // ── Delete child rows that lack onDelete: Cascade in the schema ──
+  // These must be removed before prisma.show.delete() or Postgres throws a FK violation.
+  await prisma.$transaction([
+    prisma.bookmark.deleteMany({ where: { show_id: id } }),
+    prisma.playlistItem.deleteMany({ where: { show_id: id } }),
+    prisma.rating.deleteMany({ where: { show_id: id } }),
+    prisma.viewCountEvent.deleteMany({ where: { show_id: id } }),
+  ]);
+
+  // Cascade deletes episodes, show_tags, episode_access, watch_history, etc.
   return prisma.show.delete({ where: { id } });
 }
 
@@ -475,6 +545,13 @@ async function updateEpisode(id, data) {
 async function deleteEpisode(id) {
   const ep = await prisma.episode.findUnique({ where: { id } });
   if (!ep) throw new AppError('Episode not found', 404);
+
+  // ── MinIO cleanup (best-effort, never blocks DB delete) ──
+  // 1. Delete all transcoded HLS files: dramas/{showId}/episodes/{episodeId}/
+  await deleteMinioPrefix(`dramas/${ep.show_id}/episodes/${id}/`);
+
+  // 2. Delete raw source video: raw/{episodeId}/video.mp4
+  await deleteMinioObject(`raw/${id}/video.mp4`);
 
   // Use transaction to ensure delete + renumber happens atomically
   await prisma.$transaction(async (tx) => {

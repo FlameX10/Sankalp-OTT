@@ -86,6 +86,7 @@ export default function ShowPlayerScreen({ navigation }) {
   const [currentIndex, setCurrentIndex] = useState(startIndex);
   const [initialScrollDone, setInitialScrollDone] = useState(false);
   const prevStartIndexRef = useRef(startIndex);
+  const currentProgressSecRef = useRef(startProgressSec || 0);
 
   // Track whether we've already done the initial seek for the starting episode
   const hasSeenRef = useRef(false);
@@ -180,12 +181,25 @@ export default function ShowPlayerScreen({ navigation }) {
 
   const returnToDramaSheet = useCallback(
     (reelItem, initialTab) => {
+      const currentEpisode = episodes[currentIndex] || reelItem;
+      const playerSnapshot = {
+        showId,
+        showTitle: currentEpisode?.show_title,
+        thumbnailUrl: currentEpisode?.thumbnail_url,
+        totalEpisodes: currentEpisode?.total_episodes || episodes.length,
+        seedEpisodes: episodes,
+        startEpisodeNum: currentEpisode?.episode_num || reelItem?.episode_num || 1,
+        streamBase: '',
+        startProgressSec: currentProgressSecRef.current || 0,
+      };
+
       if (dramaSheetSource === 'forYou') {
         dispatch(
           setForYouDramaSheetSession({
             item: reelItem,
             initialTab,
             returnToPlayer: true,
+            playerSnapshot,
           })
         );
       } else if (dramaSheetSource === 'home') {
@@ -194,12 +208,13 @@ export default function ShowPlayerScreen({ navigation }) {
             selectedItem: reelItemToHomeSelected(reelItem),
             initialTab,
             returnToPlayer: true,
+            playerSnapshot,
           })
         );
       }
       navigation.goBack();
     },
-    [dispatch, navigation, dramaSheetSource]
+    [dispatch, navigation, dramaSheetSource, episodes, currentIndex, showId]
   );
 
   useEffect(() => {
@@ -266,7 +281,10 @@ export default function ShowPlayerScreen({ navigation }) {
             // Progress update for active episode only
             onProgressUpdate={
               index === currentIndex && accessToken
-                ? (progressSec) => recordWatchHistory(item, progressSec)
+                ? (progressSec) => {
+                    currentProgressSecRef.current = progressSec;
+                    recordWatchHistory(item, progressSec);
+                  }
                 : null
             }
             showPlaybackSpeedControl

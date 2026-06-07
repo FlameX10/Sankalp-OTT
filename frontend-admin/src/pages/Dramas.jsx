@@ -238,6 +238,7 @@ function DramaModal({ open, onClose, onSave, initial, initialStep = 0, autoAddEp
               </FormGroup>
             </div>
           </ModalSection>
+          {/* OPTIONS SECTION — commented out pending team discussion
           <ModalSection title="Options">
             <FormGroup label="For You feed position">
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -245,7 +246,7 @@ function DramaModal({ open, onClose, onSave, initial, initialStep = 0, autoAddEp
                   placeholder="0" value={form.feed_position || ''}
                   onChange={e => upd('feed_position', parseInt(e.target.value) || 0)} />
                 <div style={{ fontSize:11, color:'var(--text3)' }}>
-                  {form.feed_position > 0 
+                  {form.feed_position > 0
                     ? `Position ${form.feed_position} in For You feed`
                     : 'Set 1, 2, 3… to show in For You feed. 0 = not featured.'}
                 </div>
@@ -263,9 +264,8 @@ function DramaModal({ open, onClose, onSave, initial, initialStep = 0, autoAddEp
                 </div>
               </div>
             </FormGroup>
-
-
           </ModalSection>
+          */}
         </>
       )}
 
@@ -776,7 +776,7 @@ export default function Dramas() {
         {[
           { label:'Total Dramas', value:dramas.length, sub:`${dramas.filter(d=>d.episodes.some(e=>!e.is_free)).length} with paid episodes`, color:'var(--accent2)' },
           { label:'Total Episodes', value:dramas.reduce((a,d)=>a+d.episodes.length,0), sub:'across all dramas', color:'var(--text)' },
-          { label:'Total Views', value:'6.6M', sub:'all-time combined', color:'var(--green)' },
+          { label:'Total Views', value: (() => { const t = dramas.reduce((a,d)=>a+(d.views||0),0); return t >= 1_000_000 ? `${(t/1_000_000).toFixed(1)}M` : t >= 1_000 ? `${(t/1_000).toFixed(1)}K` : t.toString() })(), sub:'all-time combined', color:'var(--green)' },
           { label:'Coin Unlocks', value:dramas.reduce((a,d)=>a+(d.unlocks||0),0).toLocaleString(), sub:'episodes unlocked', color:'var(--amber)' },
         ].map(m => (
           <div className="metric-card" key={m.label}>
@@ -837,7 +837,6 @@ export default function Dramas() {
                         <div style={{ fontWeight: 500, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '300px' }}>{d.title}</div>
                         {d.feed_position > 0 && <div style={{ fontSize: 10, color: 'var(--accent2)', whiteSpace: 'nowrap', flexShrink: 0 }}>★ For You #{d.feed_position}</div>}
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '400px' }}>{d.id}</div>
                       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11 }}>
                         <span className="badge badge-blue" style={{ fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}>{d.category}</span>
                         <div style={{ color: 'var(--text3)' }}>{d.episodes.length} episodes {d.episodes.filter(e=>!e.is_free).length > 0 && `· ${d.episodes.filter(e=>!e.is_free).length} paid`}</div>
@@ -856,7 +855,7 @@ export default function Dramas() {
                         </div>
                       ) : <span style={{ color: 'var(--text3)', fontSize: 11 }}>—</span>}
                       <div style={{ textAlign: 'right', minWidth: 50 }}>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: 12 }}>{d.views}</div>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 12 }}>{(() => { const v = d.views||0; return v >= 1_000_000 ? `${(v/1_000_000).toFixed(1)}M` : v >= 1_000 ? `${(v/1_000).toFixed(1)}K` : v.toString() })()}</div>
                         <div style={{ fontSize: 10, color: 'var(--text3)' }}>views</div>
                       </div>
                       <span className={`badge ${d.status==='Published'?'badge-green':'badge-amber'}`} style={{ minWidth: 'fit-content' }}>{d.status}</span>

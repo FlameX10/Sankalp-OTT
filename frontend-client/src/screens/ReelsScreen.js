@@ -41,6 +41,9 @@ function selectPendingHomeBanner(state) {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const COLUMN_WIDTH = (SCREEN_WIDTH - 32) / 3;
+const TAG_GRID_GAP = 8;
+const TAG_GRID_WIDTH = SCREEN_WIDTH - 32;
+const TAG_GRID_ITEM_WIDTH = (TAG_GRID_WIDTH - TAG_GRID_GAP * 2) / 3;
 const feedApi = createAuthenticatedApi({
   baseURL: API_BASE_URL,
 });
@@ -94,6 +97,7 @@ export default function PopularScreen() {
   const [selected, setSelected] = useState(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [sheetInitialTab, setSheetInitialTab] = useState('synopsis');
+  const [sheetHistory, setSheetHistory] = useState([]);
   const [tabs, setTabs] = useState([]);
   const [activeTab, setActiveTab] = useState(null);
   const [shows, setShows] = useState([]);
@@ -269,6 +273,7 @@ export default function PopularScreen() {
       setDramaSheetKey((k) => k + 1);
       setSelected(selectedItem);
       setSheetInitialTab(initialTab || 'synopsis');
+      setSheetHistory([]);
       setSheetVisible(true);
       fetchShowDetails(selectedItem.show_id, 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -297,7 +302,15 @@ export default function PopularScreen() {
   };
 
   const openDetails = useCallback(
-    (item, initialTab = 'synopsis') => {
+    (item, initialTab = 'synopsis', options = {}) => {
+      if (options.fromRelated && selected) {
+        setSheetHistory((history) => [
+          ...history,
+          { item: selected, initialTab: sheetInitialTab },
+        ]);
+      } else {
+        setSheetHistory([]);
+      }
       setDramaSheetKey((k) => k + 1);
       const showId = item.id ?? item.show_id;
       const selectedItem = {
@@ -311,10 +324,21 @@ export default function PopularScreen() {
       setSelected(selectedItem);
       setSheetInitialTab(initialTab);
       setSheetVisible(true);
-      dispatch(setHomeDramaSheetSession({ selectedItem, initialTab }));
+      dispatch(setHomeDramaSheetSession({
+        selectedItem,
+        initialTab,
+        returnToPlayer: homeSession?.returnToPlayer,
+        playerSnapshot: homeSession?.playerSnapshot,
+      }));
       fetchShowDetails(showId, 1);
     },
-    [dispatch, accessToken]
+    [
+      dispatch,
+      homeSession?.playerSnapshot,
+      homeSession?.returnToPlayer,
+      selected,
+      sheetInitialTab,
+    ]
   );
 
   const handleRelatedPress = useCallback(
@@ -328,7 +352,7 @@ export default function PopularScreen() {
         view_count: relatedItem.view_count,
         tags: relatedItem.tags,
         episode_count: relatedItem.episode_count,
-      });
+      }, 'synopsis', { fromRelated: true });
     },
     [openDetails]
   );
@@ -378,15 +402,38 @@ export default function PopularScreen() {
   };
 
   const handleCloseSheet = () => {
+    if (sheetHistory.length > 0) {
+      const previous = sheetHistory[sheetHistory.length - 1];
+      setSheetHistory((history) => history.slice(0, -1));
+      setDramaSheetKey((k) => k + 1);
+      setSelected(previous.item);
+      setSheetInitialTab(previous.initialTab || 'synopsis');
+      dispatch(setHomeDramaSheetSession({
+        selectedItem: previous.item,
+        initialTab: previous.initialTab || 'synopsis',
+        returnToPlayer: homeSession?.returnToPlayer,
+        playerSnapshot: homeSession?.playerSnapshot,
+      }));
+      setShowDetails(null);
+      setShowDetailsError(null);
+      fetchShowDetails(previous.item.show_id, 1);
+      return;
+    }
+
     const returnToPlayer = homeSession?.returnToPlayer;
+    const playerSnapshot = homeSession?.playerSnapshot;
     dispatch(setHomeReopenSheetAfterPlayer(false));
     setSheetVisible(false);
     setSelected(null);
+    setSheetHistory([]);
     setShowDetails(null);
     setShowDetailsError(null);
     dispatch(clearHomeDramaSheetSession());
 
     if (returnToPlayer) {
+      if (playerSnapshot) {
+        dispatch(initShowPlayer(playerSnapshot));
+      }
       navigation.navigate(ROUTES.SHOW_PLAYER, { fromHome: true });
     }
   };
@@ -455,13 +502,15 @@ export default function PopularScreen() {
                   {allTags.length === 0 ? (
                     <Text style={styles.tagSearchEmpty}>No tags available</Text>
                   ) : (
-                    allTags.map((tag) => {
+                    allTags.map((tag, index) => {
                       const isSelected = selectedTags.includes(tag.name);
+                      const isThirdColumn = (index + 1) % 3 === 0;
                       return (
                         <TouchableOpacity
                           key={tag.id}
                           style={[
                             styles.tagSearchItem,
+                            isThirdColumn && styles.tagSearchItemLastInRow,
                             isSelected && styles.tagSearchItemActive,
                           ]}
                           onPress={() => toggleTag(tag.name)}
@@ -471,6 +520,9 @@ export default function PopularScreen() {
                               styles.tagSearchItemText,
                               isSelected && styles.tagSearchItemTextActive,
                             ]}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.78}
                           >
                             {tag.name}
                           </Text>
@@ -637,6 +689,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 2,
     backgroundColor: 'transparent',
+    width: TAG_GRID_WIDTH,
   },
   tagFilterScroll: {
     maxHeight: 220,
@@ -657,15 +710,24 @@ const styles = StyleSheet.create({
   tagSearchWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    width: TAG_GRID_WIDTH,
   },
   tagSearchItem: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 16,
+    width: TAG_GRID_ITEM_WIDTH,
+    minHeight: 42,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    marginRight: TAG_GRID_GAP,
+    marginBottom: 10,
+    borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tagSearchItemLastInRow: {
+    marginRight: 0,
   },
   tagSearchItemActive: {
     backgroundColor: 'rgba(255, 45, 85, 0.9)',
@@ -675,6 +737,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.82)',
     fontSize: 13,
     fontWeight: '600',
+    textAlign: 'center',
   },
   tagSearchItemTextActive: {
     color: theme.white,

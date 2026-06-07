@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSelector } from 'react-redux'
-import { Plus, Edit2, Trash2, RefreshCw, Shield, ShieldCheck } from 'lucide-react'
+import { Plus, Edit2, Trash2, RefreshCw, Shield, ShieldCheck, Eye, EyeOff } from 'lucide-react'
 import Modal, { FormGroup, ModalSection } from '../components/ui/Modal.jsx'
 import { Toggle, ConfirmDialog } from '../components/ui/Controls.jsx'
 import { subAdminApi } from '../services/api.js'
@@ -14,6 +14,7 @@ function AdminModal({ open, onClose, onSave, initial, saving }) {
     initial || { name: '', email: '', password: '', role: 'sub_admin', status: 'Active', sections: ['dashboard'] }
   )
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -21,6 +22,7 @@ function AdminModal({ open, onClose, onSave, initial, saving }) {
         initial || { name: '', email: '', password: '', role: 'sub_admin', status: 'Active', sections: ['dashboard'] }
       )
       setError('')
+      setShowPassword(false)
     }
   }, [open, initial])
 
@@ -89,24 +91,44 @@ function AdminModal({ open, onClose, onSave, initial, saving }) {
         </div>
         {!isEdit && (
           <FormGroup label="Temporary password *">
-            <input
-              className="input"
-              type="password"
-              placeholder="Min 8 characters"
-              value={form.password || ''}
-              onChange={(e) => upd('password', e.target.value)}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                className="input"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Min 8 characters"
+                value={form.password || ''}
+                onChange={(e) => upd('password', e.target.value)}
+                style={{ paddingRight: 36 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 0, display: 'flex', alignItems: 'center' }}
+              >
+                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
           </FormGroup>
         )}
         {isEdit && !isMainAdmin && (
           <FormGroup label="New password (optional)">
-            <input
-              className="input"
-              type="password"
-              placeholder="Leave blank to keep current"
-              value={form.password || ''}
-              onChange={(e) => upd('password', e.target.value)}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                className="input"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Leave blank to keep current"
+                value={form.password || ''}
+                onChange={(e) => upd('password', e.target.value)}
+                style={{ paddingRight: 36 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 0, display: 'flex', alignItems: 'center' }}
+              >
+                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
           </FormGroup>
         )}
       </ModalSection>
@@ -382,15 +404,17 @@ export default function Roles() {
                           <td style={{ color: 'var(--text3)', fontSize: 12 }}>{a.lastActive}</td>
                           <td>
                             <div style={{ display: 'flex', gap: 5 }}>
-                              <button
-                                className="btn btn-ghost btn-sm"
-                                onClick={() => {
-                                  setSelected(a)
-                                  setModal('admin-edit')
-                                }}
-                              >
-                                <Edit2 size={11} /> Edit
-                              </button>
+                              {a.role !== 'admin' && (
+                                <button
+                                  className="btn btn-ghost btn-sm"
+                                  onClick={() => {
+                                    setSelected(a)
+                                    setModal('admin-edit')
+                                  }}
+                                >
+                                  <Edit2 size={11} /> Edit
+                                </button>
+                              )}
                               {a.role !== 'admin' && (
                                 <button
                                   className="btn btn-danger btn-sm"

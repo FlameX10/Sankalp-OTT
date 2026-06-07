@@ -115,7 +115,6 @@ export default function ShortVideoReelItem({
     duration,
     firstFrameReady,
     manuallyPaused,
-    togglePlayback,
     setManualPaused,
     seekTo,
     onLoad: originalOnLoad,
@@ -234,18 +233,15 @@ export default function ShortVideoReelItem({
 
   const handleOttScrimPress = useCallback(() => {
     if (!showOttOverlayControls || !isActive || isLocked) return;
-    if (!controlsVisible) {
-      setControlsVisible(true);
-      return;
-    }
-    togglePlayback();
-  }, [showOttOverlayControls, isActive, isLocked, controlsVisible, togglePlayback]);
+    setControlsVisible(true);
+    setControlsInteractionTick((tick) => tick + 1);
+  }, [showOttOverlayControls, isActive, isLocked]);
 
   const handleNonOttVideoPress = useCallback(() => {
     if (showOttOverlayControls || !isActive || isLocked) return;
     setControlsVisible(true);
-    togglePlayback();
-  }, [showOttOverlayControls, isActive, isLocked, togglePlayback]);
+    setControlsInteractionTick((tick) => tick + 1);
+  }, [showOttOverlayControls, isActive, isLocked]);
 
   const handlePlayPausePress = useCallback(() => {
     setControlsVisible(true);

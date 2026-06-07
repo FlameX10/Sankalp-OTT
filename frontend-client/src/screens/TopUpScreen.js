@@ -34,8 +34,16 @@ export default function TopUpScreen() {
   const coins = useSelector((s) => s.auth?.coins);
 
   const returnToShowPlayer = !!route.params?.returnToShowPlayer;
+  const returnToForYou = !!route.params?.returnToForYou;
 
-  const handleBackToPlayer = useCallback(() => {
+  const handleReturnBack = useCallback(() => {
+    if (returnToForYou) {
+      navigation.navigate(ROUTES.MAIN_TABS, {
+        screen: ROUTES.FOR_YOU,
+      });
+      return;
+    }
+
     // Pop back to the existing ShowPlayer route instead of pushing a new one.
     // This prevents: TopUp -> ShowPlayer -> TopUp bounce.
     let nav = navigation;
@@ -58,18 +66,18 @@ export default function TopUpScreen() {
       fromHome: !!route.params?.fromHome,
       fromForYou: !!route.params?.fromForYou,
     });
-  }, [navigation, route.params?.fromHome, route.params?.fromForYou]);
+  }, [navigation, returnToForYou, route.params?.fromHome, route.params?.fromForYou]);
 
   useLayoutEffect(() => {
-    if (!returnToShowPlayer) return;
+    if (!returnToShowPlayer && !returnToForYou) return;
     navigation.setOptions({
       headerLeft: () => (
-        <Pressable onPress={handleBackToPlayer} hitSlop={12} style={{ paddingLeft: 4 }}>
+        <Pressable onPress={handleReturnBack} hitSlop={12} style={{ paddingLeft: 4 }}>
           <Ionicons name="chevron-back" size={26} color={theme.white} />
         </Pressable>
       ),
     });
-  }, [navigation, returnToShowPlayer, handleBackToPlayer]);
+  }, [navigation, returnToShowPlayer, returnToForYou, handleReturnBack]);
 
   const [packs, setPacks] = useState([]);
   const [loadingPacks, setLoadingPacks] = useState(true);
@@ -124,8 +132,8 @@ export default function TopUpScreen() {
       await authService.patchUserDataInStore({ coins: data.coins });
       setConfirmOpen(false);
       setSelectedPack(null);
-      if (returnToShowPlayer) {
-        handleBackToPlayer();
+      if (returnToShowPlayer || returnToForYou) {
+        handleReturnBack();
       } else {
         Alert.alert('Success', 'Coins have been added to your wallet.');
       }

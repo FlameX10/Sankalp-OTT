@@ -64,6 +64,7 @@ export default function ForYouScreen() {
   const [sheetVisible, setSheetVisible] = useState(false);
   const [selectedDrama, setSelectedDrama] = useState(null);
   const [sheetInitialTab, setSheetInitialTab] = useState('synopsis');
+  const [sheetHistory, setSheetHistory] = useState([]);
   const [dramaSheetKey, setDramaSheetKey] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(SCREEN_HEIGHT);
 
@@ -90,6 +91,7 @@ export default function ForYouScreen() {
       setDramaSheetKey((k) => k + 1);
       setSelectedDrama(item);
       setSheetInitialTab(initialTab || 'synopsis');
+      setSheetHistory([]);
       setSheetVisible(true);
       const sid = item.show_id;
       if (!showMode || showMode.show_id !== sid) {
@@ -113,19 +115,38 @@ export default function ForYouScreen() {
     }
   }, [dispatch, hasMore, items.length, offset, viewportHeight]);
 
-  const openDramaDetails = useCallback((item, initialTab = 'synopsis') => {
+  const openDramaDetails = useCallback((item, initialTab = 'synopsis', options = {}) => {
+    if (options.fromRelated && selectedDrama) {
+      setSheetHistory((history) => [
+        ...history,
+        { item: selectedDrama, initialTab: sheetInitialTab },
+      ]);
+    } else {
+      setSheetHistory([]);
+    }
     setDramaSheetKey((k) => k + 1);
     setSelectedDrama(item);
     setSheetInitialTab(initialTab);
     setSheetVisible(true);
-    dispatch(setForYouDramaSheetSession({ item, initialTab }));
+    dispatch(setForYouDramaSheetSession({
+      item,
+      initialTab,
+      returnToPlayer: sheetSession?.returnToPlayer,
+      playerSnapshot: sheetSession?.playerSnapshot,
+    }));
     dispatch(clearShowMode());
     dispatch(fetchShowEpisodes({
       showId: item.show_id,
       fromEp: 1,
       limit: DETAILS_PAGE_SIZE,
     }));
-  }, [dispatch]);
+  }, [
+    dispatch,
+    selectedDrama,
+    sheetInitialTab,
+    sheetSession?.playerSnapshot,
+    sheetSession?.returnToPlayer,
+  ]);
 
   const handleRelatedPress = useCallback(
     (relatedItem) => {
@@ -138,7 +159,7 @@ export default function ForYouScreen() {
         tags: relatedItem.tags,
         total_episodes: relatedItem.episode_count || 0,
         episode_num: 1,
-      });
+      }, 'synopsis', { fromRelated: true });
     },
     [openDramaDetails]
   );
@@ -161,17 +182,49 @@ export default function ForYouScreen() {
   }, [dispatch, selectedDrama]);
 
   const handleCloseSheet = useCallback(() => {
+    if (sheetHistory.length > 0) {
+      const previous = sheetHistory[sheetHistory.length - 1];
+      setSheetHistory((history) => history.slice(0, -1));
+      setDramaSheetKey((k) => k + 1);
+      setSelectedDrama(previous.item);
+      setSheetInitialTab(previous.initialTab || 'synopsis');
+      dispatch(setForYouDramaSheetSession({
+        item: previous.item,
+        initialTab: previous.initialTab || 'synopsis',
+        returnToPlayer: sheetSession?.returnToPlayer,
+        playerSnapshot: sheetSession?.playerSnapshot,
+      }));
+      dispatch(clearShowMode());
+      dispatch(fetchShowEpisodes({
+        showId: previous.item.show_id,
+        fromEp: 1,
+        limit: DETAILS_PAGE_SIZE,
+      }));
+      return;
+    }
+
     const returnToPlayer = sheetSession?.returnToPlayer;
+    const playerSnapshot = sheetSession?.playerSnapshot;
     dispatch(setForYouReopenSheetAfterPlayer(false));
     setSheetVisible(false);
     setSelectedDrama(null);
+    setSheetHistory([]);
     dispatch(clearForYouDramaSheetSession());
     dispatch(clearShowMode());
 
     if (returnToPlayer) {
+      if (playerSnapshot) {
+        dispatch(initShowPlayer(playerSnapshot));
+      }
       navigation.navigate(ROUTES.SHOW_PLAYER, { fromForYou: true });
     }
-  }, [dispatch, navigation, sheetSession?.returnToPlayer]);
+  }, [
+    dispatch,
+    navigation,
+    sheetHistory,
+    sheetSession?.playerSnapshot,
+    sheetSession?.returnToPlayer,
+  ]);
 
   const handleEpisodePress = useCallback((episode) => {
     if (!selectedDrama || !showMode) return;
@@ -256,6 +309,10 @@ export default function ForYouScreen() {
             onWatchAll={handleOpenEpisodes}
             streamBase={API_BASE_URL}
             itemHeight={viewportHeight}
+            walletReturnParams={{
+              returnToShowPlayer: false,
+              returnToForYou: true,
+            }}
             showPlaybackSpeedControl
             showOttOverlayControls
           />

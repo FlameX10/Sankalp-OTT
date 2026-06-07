@@ -87,7 +87,10 @@ export const loadDramas = createAsyncThunk(
             return {
               ...show,
               view_count: show.view_count || 0,
+              views: show.view_count || 0,           // displayed aggregate (organic + manual)
               unlocks: show.unlock_count || 0,
+              thumbnailPreview: show.thumbnail_url || null,
+              bannerPreview: show.banner_url || null,
               episodes: (epRes.data || []).map((ep) => ({
                 id:        ep.id,
                 title:     ep.title,

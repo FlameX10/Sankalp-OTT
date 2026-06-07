@@ -1183,7 +1183,7 @@ export async function getAnalyticsReport(req, res, next) {
 
 /**
  * GET /api/v1/admin/dashboard/revenue-chart?period=Daily|Weekly|Monthly|Annual|All
- * Returns day-by-day revenue (total, membership, topup) for the selected period
+ * Returns revenue grouped by day (Daily/Weekly/Monthly), month (Annual), or year (All)
  */
 export async function getRevenueChart(req, res, next) {
   try {
@@ -1200,36 +1200,94 @@ export async function getRevenueChart(req, res, next) {
       orderBy: { created_at: 'asc' },
     });
 
-    // Build a map of date -> { total, membership, topup }
-    const dayMap = {};
+    let chartData;
 
-    // Pre-populate every day in range so chart has no gaps
-    const cursor = new Date(startDate);
-    cursor.setHours(0, 0, 0, 0);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
-    while (cursor <= end) {
-      const key = cursor.toISOString().split('T')[0]; // YYYY-MM-DD
-      dayMap[key] = { date: key, total: 0, membership: 0, topup: 0 };
-      cursor.setDate(cursor.getDate() + 1);
+    if (period === 'Annual') {
+      // Group by month: YYYY-MM
+      const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const monthMap = {};
+      // Only pre-populate months up to and including the current month
+      const now2 = new Date();
+      const year = now2.getFullYear();
+      const currentMonth = now2.getMonth(); // 0-indexed
+      for (let m = 0; m <= currentMonth; m++) {
+        const key = `${year}-${String(m + 1).padStart(2, '0')}`;
+        monthMap[key] = { date: key, label: MONTH_NAMES[m], total: 0, membership: 0, topup: 0 };
+      }
+      for (const tx of transactions) {
+        const d = new Date(tx.created_at);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if (!monthMap[key]) continue;
+        const amt = parseFloat(tx.amount) || 0;
+        monthMap[key].total += amt;
+        if (tx.type === 'membership') monthMap[key].membership += amt;
+        else if (tx.type === 'topup') monthMap[key].topup += amt;
+      }
+      // For the current month, append today's day to the label so users know it's partial
+      const todayDay = now2.getDate();
+      const currentMonthKey = `${year}-${String(currentMonth + 1).padStart(2, '0')}`;
+      chartData = Object.values(monthMap).map(d => ({
+        date: d.date,
+        label: d.date === currentMonthKey ? `${d.label} ${todayDay}` : d.label,
+        total: parseFloat(d.total.toFixed(2)),
+        membership: parseFloat(d.membership.toFixed(2)),
+        topup: parseFloat(d.topup.toFixed(2)),
+      }));
+
+    } else if (period === 'All') {
+      // Group by year
+      const yearMap = {};
+      for (const tx of transactions) {
+        const year = String(new Date(tx.created_at).getFullYear());
+        if (!yearMap[year]) yearMap[year] = { date: year, label: year, total: 0, membership: 0, topup: 0 };
+        const amt = parseFloat(tx.amount) || 0;
+        yearMap[year].total += amt;
+        if (tx.type === 'membership') yearMap[year].membership += amt;
+        else if (tx.type === 'topup') yearMap[year].topup += amt;
+      }
+      chartData = Object.values(yearMap)
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map(d => ({
+          date: d.date,
+          label: d.label,
+          total: parseFloat(d.total.toFixed(2)),
+          membership: parseFloat(d.membership.toFixed(2)),
+          topup: parseFloat(d.topup.toFixed(2)),
+        }));
+      // If no data, return at least current year
+      if (chartData.length === 0) {
+        const y = String(new Date().getFullYear());
+        chartData = [{ date: y, label: y, total: 0, membership: 0, topup: 0 }];
+      }
+
+    } else {
+      // Daily grouping (Daily / Weekly / Monthly)
+      const dayMap = {};
+      const cursor = new Date(startDate);
+      cursor.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      while (cursor <= end) {
+        const key = cursor.toISOString().split('T')[0]; // YYYY-MM-DD
+        dayMap[key] = { date: key, label: key, total: 0, membership: 0, topup: 0 };
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      for (const tx of transactions) {
+        const key = new Date(tx.created_at).toISOString().split('T')[0];
+        if (!dayMap[key]) continue;
+        const amt = parseFloat(tx.amount) || 0;
+        dayMap[key].total += amt;
+        if (tx.type === 'membership') dayMap[key].membership += amt;
+        else if (tx.type === 'topup') dayMap[key].topup += amt;
+      }
+      chartData = Object.values(dayMap).map(d => ({
+        date: d.date,
+        label: d.label,
+        total: parseFloat(d.total.toFixed(2)),
+        membership: parseFloat(d.membership.toFixed(2)),
+        topup: parseFloat(d.topup.toFixed(2)),
+      }));
     }
-
-    // Accumulate
-    for (const tx of transactions) {
-      const key = new Date(tx.created_at).toISOString().split('T')[0];
-      if (!dayMap[key]) continue;
-      const amt = parseFloat(tx.amount) || 0;
-      dayMap[key].total += amt;
-      if (tx.type === 'membership') dayMap[key].membership += amt;
-      else if (tx.type === 'topup') dayMap[key].topup += amt;
-    }
-
-    const chartData = Object.values(dayMap).map(d => ({
-      date: d.date,
-      total: parseFloat(d.total.toFixed(2)),
-      membership: parseFloat(d.membership.toFixed(2)),
-      topup: parseFloat(d.topup.toFixed(2)),
-    }));
 
     return res.json(
       new ApiResponse(200, { chartData, period }, 'Revenue chart data fetched successfully')
@@ -1241,59 +1299,42 @@ export async function getRevenueChart(req, res, next) {
 
 /**
  * GET /api/v1/admin/dashboard/top-shows?period=Daily|Weekly|Monthly|Annual|All
- * Returns top 5 shows by episode unlocks in the selected period
+ * Returns top 5 shows by views (ViewCountEvent) in the selected period
  */
 export async function getTopShowsChart(req, res, next) {
   try {
     const { period = 'Daily' } = req.query;
     const { startDate, endDate } = getDateRange(period);
 
-    // Group episode unlocks by episode, count them
-    const topEpisodes = await prisma.episodeAccess.groupBy({
-      by: ['episode_id'],
-      where: { unlocked_at: { gte: startDate, lte: endDate } },
-      _count: { episode_id: true },
-      _sum: { coins_spent: true },
-      orderBy: { _count: { episode_id: 'desc' } },
-      take: 20, // fetch more than 5 to account for grouping by show
+    // Group ViewCountEvent by show_id, count views
+    const topShowViews = await prisma.viewCountEvent.groupBy({
+      by: ['show_id'],
+      where: { created_at: { gte: startDate, lte: endDate } },
+      _count: { show_id: true },
+      orderBy: { _count: { show_id: 'desc' } },
+      take: 5,
     });
 
-    if (topEpisodes.length === 0) {
+    if (topShowViews.length === 0) {
       return res.json(new ApiResponse(200, { chartData: [], period }, 'No data'));
     }
 
-    // Fetch episode -> show mapping
-    const episodeIds = topEpisodes.map(e => e.episode_id);
-    const episodes = await prisma.episode.findMany({
-      where: { id: { in: episodeIds } },
-      select: { id: true, show_id: true, show: { select: { id: true, title: true } } },
+    // Fetch show titles
+    const showIds = topShowViews.map(s => s.show_id);
+    const shows = await prisma.show.findMany({
+      where: { id: { in: showIds } },
+      select: { id: true, title: true },
     });
 
-    const episodeShowMap = {};
-    for (const ep of episodes) {
-      episodeShowMap[ep.id] = { showId: ep.show_id, showTitle: ep.show?.title || 'Unknown' };
-    }
+    const showTitleMap = {};
+    for (const s of shows) showTitleMap[s.id] = s.title;
 
-    // Aggregate by show
-    const showMap = {};
-    for (const ep of topEpisodes) {
-      const info = episodeShowMap[ep.episode_id];
-      if (!info) continue;
-      if (!showMap[info.showId]) {
-        showMap[info.showId] = { showId: info.showId, show: info.showTitle, unlocks: 0, coinsSpent: 0 };
-      }
-      showMap[info.showId].unlocks += ep._count.episode_id;
-      showMap[info.showId].coinsSpent += ep._sum.coins_spent || 0;
-    }
-
-    const chartData = Object.values(showMap)
-      .sort((a, b) => b.unlocks - a.unlocks)
-      .slice(0, 5)
+    const chartData = topShowViews
       .map(s => ({
-        show: s.show,
-        unlocks: s.unlocks,
-        coinsSpent: s.coinsSpent,
-      }));
+        show: showTitleMap[s.show_id] || 'Unknown',
+        views: s._count.show_id,
+      }))
+      .sort((a, b) => b.views - a.views);
 
     return res.json(
       new ApiResponse(200, { chartData, period }, 'Top shows chart data fetched successfully')

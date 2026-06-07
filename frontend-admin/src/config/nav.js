@@ -5,7 +5,7 @@ export const NAV_CONFIG = [
   },
   {
     section: 'Users',
-    items: [{ id: 'users', label: 'User Management', badge: '48K' }],
+    items: [{ id: 'users', label: 'User Management', badge: null }],
   },
   {
     section: 'Content',
@@ -25,7 +25,7 @@ export const NAV_CONFIG = [
   },
   {
     section: 'Engagement',
-    items: [{ id: 'notifications', label: 'Notifications', badge: '3' }],
+    items: [{ id: 'notifications', label: 'Notifications', badge: null }],
   },
   {
     section: 'System',

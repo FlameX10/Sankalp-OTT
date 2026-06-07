@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, Users, Film, DollarSign, Coins, AlertTriangle, CreditCard, Wallet } from 'lucide-react'
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts'
 import api from '../services/api'
 
@@ -12,18 +12,34 @@ const metricIcons = [DollarSign, CreditCard, Wallet, Users, CreditCard, Film, Co
 
 const alerts = []
 
-// Format date label for X axis
-function formatDateLabel(dateStr) {
+// Format date label for X axis based on period
+function formatDateLabel(dateStr, period) {
+  if (period === 'Annual') {
+    // dateStr is YYYY-MM, return month name
+    const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    const parts = dateStr.split('-')
+    if (parts.length >= 2) return MONTH_NAMES[parseInt(parts[1], 10) - 1] || dateStr
+    return dateStr
+  }
+  if (period === 'All') {
+    // dateStr is YYYY (year)
+    return dateStr
+  }
+  // Default: day/month from YYYY-MM-DD
   const d = new Date(dateStr)
   return `${d.getDate()}/${d.getMonth() + 1}`
 }
 
 // Custom tooltip for revenue chart
-function RevenueTooltip({ active, payload, label }) {
+function RevenueTooltip({ active, payload, label, period }) {
   if (!active || !payload?.length) return null
+  // Detect if this is the current (partial) month label — it contains a space and digit e.g. "Jun 8"
+  const isPartial = period === 'Annual' && /\w+ \d+/.test(label)
   return (
     <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 12 }}>
-      <div style={{ color: 'var(--text2)', marginBottom: 4 }}>{label}</div>
+      <div style={{ color: 'var(--text2)', marginBottom: 4 }}>
+        {label}{isPartial ? ' (month to date)' : ''}
+      </div>
       {payload.map(p => (
         <div key={p.dataKey} style={{ color: p.color, display: 'flex', gap: 8, justifyContent: 'space-between' }}>
           <span>{p.name}</span>
@@ -49,6 +65,8 @@ function ShowsTooltip({ active, payload, label }) {
     </div>
   )
 }
+
+const BAR_COLORS = ['var(--accent)', 'var(--blue)', 'var(--green)', '#a78bfa', '#f472b6']
 
 export default function Dashboard() {
   const [period, setPeriod] = useState('Daily')
@@ -188,8 +206,8 @@ export default function Dashboard() {
                 <LineChart data={revenueChart} margin={{ top:4, right:8, left:0, bottom:0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis
-                    dataKey="date"
-                    tickFormatter={formatDateLabel}
+                    dataKey={period === 'Annual' || period === 'All' ? 'label' : 'date'}
+                    tickFormatter={v => period === 'Annual' || period === 'All' ? v : formatDateLabel(v, period)}
                     tick={{ fontSize:10, fill:'var(--text3)' }}
                     axisLine={false}
                     tickLine={false}
@@ -201,7 +219,7 @@ export default function Dashboard() {
                     tickFormatter={v => v >= 1000 ? `₹${(v/1000).toFixed(0)}k` : `₹${v}`}
                     width={45}
                   />
-                  <Tooltip content={<RevenueTooltip />} />
+                  <Tooltip content={<RevenueTooltip period={period} />} />
                   <Legend wrapperStyle={{ fontSize:11, paddingTop:8 }} />
                   <Line type="monotone" dataKey="total" name="Total" stroke="var(--accent)" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="membership" name="Membership" stroke="var(--green)" strokeWidth={2} dot={false} />
@@ -211,34 +229,38 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Top 5 shows by unlocks */}
+          {/* Top 5 shows by views — vertical bar chart */}
           <div className="metric-card" style={{ padding:'16px 18px' }}>
-            <div style={{ fontWeight:600, fontSize:13, marginBottom:16, color:'var(--text)' }}>Top shows by unlocks</div>
+            <div style={{ fontWeight:600, fontSize:13, marginBottom:16, color:'var(--text)' }}>Top shows by views</div>
             {chartsLoading ? (
               <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:220, color:'var(--text3)', fontSize:12 }}>Loading...</div>
             ) : topShows.length === 0 ? (
               <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:220, color:'var(--text3)', fontSize:12 }}>No data for this period</div>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={topShows} layout="vertical" margin={{ top:4, right:8, left:0, bottom:0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                <BarChart data={topShows} margin={{ top:4, right:8, left:0, bottom:40 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis
-                    type="number"
-                    tick={{ fontSize:10, fill:'var(--text3)' }}
+                    dataKey="show"
+                    tick={{ fontSize:9, fill:'var(--text3)', angle:-25, textAnchor:'end' }}
                     axisLine={false}
                     tickLine={false}
+                    interval={0}
+                    tickFormatter={v => v.length > 10 ? v.slice(0, 10) + '…' : v}
                   />
                   <YAxis
-                    type="category"
-                    dataKey="show"
                     tick={{ fontSize:10, fill:'var(--text3)' }}
                     axisLine={false}
                     tickLine={false}
-                    width={90}
-                    tickFormatter={v => v.length > 12 ? v.slice(0, 12) + '…' : v}
+                    allowDecimals={false}
+                    width={30}
                   />
                   <Tooltip content={<ShowsTooltip />} />
-                  <Bar dataKey="unlocks" name="Unlocks" fill="var(--accent)" radius={[0, 3, 3, 0]} />
+                  <Bar dataKey="views" name="Views" radius={[3, 3, 0, 0]}>
+                    {topShows.map((_, idx) => (
+                      <Cell key={idx} fill={BAR_COLORS[idx % BAR_COLORS.length]} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}

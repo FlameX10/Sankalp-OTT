@@ -60,6 +60,11 @@ export default function Topbar() {
             {userInitials}
           </button>
 
+          {/* Click-outside overlay */}
+          {showMenu && (
+            <div onClick={() => setShowMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 999 }} />
+          )}
+
           {/* Dropdown Menu */}
           {showMenu && (
             <div style={{

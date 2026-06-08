@@ -38,7 +38,6 @@ import { setPendingHomeBanner } from '../../redux/slices/promoFlowSlice';
 import { patchUserProfile, setCoins } from '../../redux/slices/authSlice';
 import { ROUTES } from '../../constants/routes';
 import * as authService from '../../services/authService';
-import { api } from '../../services/api';
 
 const MODAL_SETTLE_MS = 120;
 
@@ -51,6 +50,12 @@ function pause(ms = MODAL_SETTLE_MS) {
  * - New user (first session): daily → banner → notification → Home
  * - First app open today (returning): daily → banner → notification → Home
  * - Later opens same day: banner → notification → membership expiry (if 3/2 days left) → Home
+ *
+ * NOTE: /auth/me is intentionally NOT called here. User profile syncing
+ * (coins, plan, membership) is owned by useUserDataSync which runs on a
+ * 200-second interval in RootStackNavigator. We read the Redux values that
+ * useUserDataSync already keeps fresh, avoiding duplicate network calls and
+ * the render-loop that duplicate dispatches used to cause.
  */
 export default function PromoFlowGate({ children }) {
   const dispatch = useDispatch();
@@ -74,9 +79,22 @@ export default function PromoFlowGate({ children }) {
   const announcementsRef = useRef([]);
   const userIdRef = useRef(userId);
 
+  // ─── Stable refs for Redux values used inside runPromoFlow ────────────────
+  // Keeping plan/membership as refs (instead of closing over them in
+  // useCallback deps) is what prevents the re-creation chain:
+  //   plan/membership change → refreshMembershipProfile new ref
+  //   → runPromoFlow new ref → useEffect re-fires → runningRef bypassed → loop
+  const planRef = useRef(plan);
+  const membershipRef = useRef(membership);
+  const accessTokenRef = useRef(accessToken);
+
   userIdRef.current = userId;
   bannersRef.current = banners;
   announcementsRef.current = announcements;
+  planRef.current = plan;
+  membershipRef.current = membership;
+  accessTokenRef.current = accessToken;
+  // ─────────────────────────────────────────────────────────────────────────
 
   const waitForClose = () =>
     new Promise((resolve) => {
@@ -95,34 +113,24 @@ export default function PromoFlowGate({ children }) {
     return user?.id ?? null;
   }, []);
 
-  const refreshMembershipProfile = useCallback(async () => {
-    if (!accessToken) return { plan, membership };
-    try {
-      const res = await api.get('/auth/me', {
-        timeout: 5000,
-      });
-      const user = res.data?.data;
-      if (!user) return { plan, membership };
-      const nextPlan = user.plan ?? plan;
-      const nextMembership = user.membership ?? null;
-      dispatch(
-        patchUserProfile({
-          plan: nextPlan,
-          membership: nextMembership,
-        })
-      );
-      await authService.patchUserDataInStore({
-        plan: nextPlan,
-        membership: nextMembership,
-      });
-      return { plan: nextPlan, membership: nextMembership };
-    } catch {
-      return { plan, membership };
-    }
-  }, [accessToken, dispatch, plan, membership]);
+  /**
+   * Reads the plan/membership that useUserDataSync already keeps fresh in
+   * Redux (via the planRef/membershipRef). Does NOT call /auth/me — that
+   * is exclusively useUserDataSync's responsibility.
+   *
+   * Stable identity: depends only on dispatch, which never changes.
+   */
+  const refreshMembershipProfile = useCallback(() => {
+    // Return the current ref values synchronously — no network call needed.
+    // useUserDataSync has already synced these from the backend.
+    return Promise.resolve({
+      plan: planRef.current,
+      membership: membershipRef.current,
+    });
+  }, [dispatch]); // dispatch is stable; plan/membership accessed via refs
 
   const runPromoFlow = useCallback(async () => {
-    if (!accessToken || runningRef.current) return;
+    if (!accessTokenRef.current || runningRef.current) return;
     runningRef.current = true;
 
     let uid = null;
@@ -137,7 +145,7 @@ export default function PromoFlowGate({ children }) {
 
       if (showDaily) {
         try {
-          const data = await fetchCheckinStatus(accessToken);
+          const data = await fetchCheckinStatus(accessTokenRef.current);
           setCheckinStatus(data);
           if (data && !data.claimed_today) {
             setStep('daily');
@@ -193,6 +201,7 @@ export default function PromoFlowGate({ children }) {
         await waitForClose();
       }
 
+      // Read plan/membership from refs — already kept fresh by useUserDataSync
       const profile = await refreshMembershipProfile();
       const reminder = getMembershipExpiryReminder({
         plan: profile.plan,
@@ -219,7 +228,9 @@ export default function PromoFlowGate({ children }) {
       setMembershipReminder(null);
       runningRef.current = false;
     }
-  }, [accessToken, resolveUserId, refreshMembershipProfile]);
+  }, [resolveUserId, refreshMembershipProfile]);
+  // accessToken intentionally read via accessTokenRef inside the callback so
+  // this function's identity stays stable across token refreshes.
 
   useEffect(() => {
     if (!accessToken) return undefined;
@@ -232,7 +243,7 @@ export default function PromoFlowGate({ children }) {
       const prev = appState.current;
       appState.current = nextState;
       if (
-        accessToken &&
+        accessTokenRef.current &&
         (prev === 'background' || prev === 'inactive') &&
         nextState === 'active'
       ) {
@@ -240,7 +251,7 @@ export default function PromoFlowGate({ children }) {
       }
     });
     return () => sub.remove();
-  }, [accessToken, runPromoFlow]);
+  }, [runPromoFlow]);
 
   const onDailyDismiss = async () => {
     const uid = await resolveUserId();
@@ -249,10 +260,10 @@ export default function PromoFlowGate({ children }) {
   };
 
   const onDailyClaim = async () => {
-    if (!accessToken) return;
+    if (!accessTokenRef.current) return;
     setClaiming(true);
     try {
-      const data = await claimDailyCheckin(accessToken);
+      const data = await claimDailyCheckin(accessTokenRef.current);
       dispatch(setCoins(data.coins));
       await authService.patchUserDataInStore({ coins: data.coins });
       const uid = await resolveUserId();

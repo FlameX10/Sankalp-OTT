@@ -3,6 +3,15 @@ import { getPresignedGetUrl } from '../../utils/presigned-url.js';
 import http from 'http';
 import https from 'https';
 
+function toHlsProxyPath(showId, episodeId, filename, childPath) {
+  if (childPath.startsWith('/api/media/hls/')) return childPath;
+  if (/^https?:\/\//i.test(childPath)) return childPath;
+
+  const dir = filename.includes('/') ? filename.substring(0, filename.lastIndexOf('/') + 1) : '';
+  const resolvedPath = `${dir}${childPath}`.replace(/^\/+/, '');
+  return `/api/media/hls/${showId}/${episodeId}/${resolvedPath}`;
+}
+
 async function getVideoUploadUrl(req, res, next) {
   try {
     const result = await mediaService.getVideoUploadUrl(req.body.show_id, req.body.episode_id);
@@ -70,23 +79,19 @@ async function hlsProxy(req, res, next) {
       protocolModule.get(presignedUrl, (stream) => {
         let body = '';
         stream.on('data', chunk => body += chunk);
-        stream.on('end', async () => {
-          // Rewrite .ts segment references to presigned MinIO URLs (direct download)
+        stream.on('end', () => {
+          // Keep child playlists and segments on stable proxy paths so nginx can cache them.
           const lines = body.split('\n');
-          const rewritten = await Promise.all(lines.map(async (line) => {
+          const rewritten = lines.map((line) => {
             const trimmed = line.trim();
             if (trimmed && !trimmed.startsWith('#') && trimmed.endsWith('.ts')) {
-              // Get the directory of the current .m3u8 to resolve relative paths
-              const dir = filename.includes('/') ? filename.substring(0, filename.lastIndexOf('/') + 1) : '';
-              const segObject = `dramas/${showId}/episodes/${episodeId}/${dir}${trimmed}`;
-              return await getPresignedGetUrl(segObject, 7200);
+              return toHlsProxyPath(showId, episodeId, filename, trimmed);
             }
             if (trimmed && !trimmed.startsWith('#') && trimmed.endsWith('.m3u8')) {
-              // Rewrite sub-playlist references to go through our proxy
-              return `/api/media/hls/${showId}/${episodeId}/${trimmed}`;
+              return toHlsProxyPath(showId, episodeId, filename, trimmed);
             }
             return line;
-          }));
+          });
           res.set('Content-Type', 'application/vnd.apple.mpegurl');
           res.set('Access-Control-Allow-Origin', '*');
           res.send(rewritten.join('\n'));
@@ -95,8 +100,20 @@ async function hlsProxy(req, res, next) {
       }).on('error', next);
 
     } else {
-      // .ts segments: 302 redirect to MinIO presigned URL (bypasses Express)
-      res.redirect(302, presignedUrl);
+      // .ts segments: stream through backend so nginx can cache the 200 response.
+      const protocolModule = presignedUrl.startsWith('https') ? https : http;
+      protocolModule.get(presignedUrl, (stream) => {
+        if (stream.statusCode === 404) {
+          return res.status(404).json({ error: 'Segment not found' });
+        }
+        if (stream.statusCode && stream.statusCode >= 400) {
+          return res.status(stream.statusCode).json({ error: 'Segment fetch failed' });
+        }
+        res.set('Content-Type', stream.headers['content-type'] || 'video/mp2t');
+        res.set('Cache-Control', 'public, max-age=3600');
+        res.set('Access-Control-Allow-Origin', '*');
+        stream.pipe(res);
+      }).on('error', next);
     }
   } catch (e) { next(e); }
 }

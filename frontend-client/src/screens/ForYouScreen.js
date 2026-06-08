@@ -304,6 +304,7 @@ export default function ForYouScreen() {
           <ShortVideoReelItem
             item={item}
             isActive={index === currentIndex}
+            shouldPreload={index === currentIndex + 1}
             isFocused={isFocused}
             onOpenDetails={handleOpenSynopsis}
             onWatchAll={handleOpenEpisodes}

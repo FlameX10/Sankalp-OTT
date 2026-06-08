@@ -66,6 +66,8 @@ export default function ShortVideoReelItem({
   walletReturnParams = null,
   showEpisodeStrip = true,
   showViewsAction = false,
+  repeatPlayback = true,
+  shouldPreload = false,
 }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -103,7 +105,7 @@ export default function ShortVideoReelItem({
   
   // Log streamUrl setup for debugging
   useEffect(() => {
-    console.log(`📺 ShortVideoReelItem mounted - Episode: ${item.episode_num}, Locked: ${isLocked}, URL: ${streamUrl?.substring(0, 80)}...`);
+    //console.log(`📺 ShortVideoReelItem mounted - Episode: ${item.episode_num}, Locked: ${isLocked}, URL: ${streamUrl?.substring(0, 80)}...`);
   }, [item.episode_num, isLocked, streamUrl]);
   
   // Track if we've already seeked for this item to avoid multiple seeks
@@ -134,7 +136,16 @@ export default function ShortVideoReelItem({
     episodeId: item.episode_id,
     accessToken,
   });
+  const shouldRenderVideo = Boolean((isActive || shouldPreload) && isFocused && streamUrl && !isLocked);
+  const videoIsVisible = isActive && shouldRenderVideo && firstFrameReady;
+  const showActiveBuffering = isActive && shouldRenderVideo && !firstFrameReady;
   const showMainOverlay = showOttOverlayControls || controlsVisible || manuallyPaused;
+
+  useEffect(() => {
+    if (shouldRenderVideo) return;
+    setFirstFrameReady(false);
+    setVideoError(null);
+  }, [shouldRenderVideo, setFirstFrameReady]);
 
   useEffect(() => {
     Animated.timing(controlsOpacity, {
@@ -146,7 +157,7 @@ export default function ShortVideoReelItem({
 
   // Wrap onLoad to seek to initialSeekSec after video metadata is loaded
   const wrappedOnLoad = useCallback((data) => {
-    console.log(`✅ Video loaded - Episode: ${item.episode_num}, Duration: ${data.duration}s`);
+    //console.log(`✅ Video loaded - Episode: ${item.episode_num}, Duration: ${data.duration}s`);
     originalOnLoad(data);
     
     // Seek to initial position immediately after metadata loads
@@ -165,7 +176,7 @@ export default function ShortVideoReelItem({
 
   // Wrap onReadyForDisplay to call onFirstFrameReady callback
   const onReadyForDisplay = useCallback(() => {
-    console.log(`🎬 First frame ready - Episode: ${item.episode_num}`);
+    //console.log(`🎬 First frame ready - Episode: ${item.episode_num}`);
     originalOnReadyForDisplay();
     if (onFirstFrameReady) {
       onFirstFrameReady();
@@ -298,7 +309,7 @@ export default function ShortVideoReelItem({
       {item.thumbnail_url ? (
         <Image
           source={{ uri: item.thumbnail_url }}
-          style={[StyleSheet.absoluteFill, { opacity: firstFrameReady ? 0 : 1 }]}
+          style={[StyleSheet.absoluteFill, { opacity: videoIsVisible ? 0 : 1 }]}
           resizeMode="cover"
           blurRadius={isLocked ? 15 : 0}
         />
@@ -307,19 +318,18 @@ export default function ShortVideoReelItem({
       )}
 
       {/* Video player */}
-      {streamUrl && !isLocked ? (
+      {shouldRenderVideo ? (
         showOttOverlayControls ? (
-          console.log(`🎬 OTT MODE (showOttOverlayControls=true) - Episode: ${item.episode_num}, resizeMode: cover`),
           <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
             <Video
               key={item.episode_id}
               ref={videoRef}
               source={{ uri: streamUrl }}
-              style={[StyleSheet.absoluteFill, { opacity: firstFrameReady ? 1 : 0 }]}
+              style={[StyleSheet.absoluteFill, { opacity: videoIsVisible ? 1 : 0 }]}
               resizeMode="cover"
               paused={paused}
               rate={playbackRate}
-              repeat={true}
+              repeat={repeatPlayback}
               controls={false}
               selectedVideoTrack={firstFrameReady ? AUTO_VIDEO_TRACK : STARTUP_VIDEO_TRACK}
               progressUpdateInterval={500}
@@ -335,7 +345,7 @@ export default function ShortVideoReelItem({
             />
           </View>
         ) : (
-          console.log(`🎬 NON-OTT MODE (showOttOverlayControls=false) - Episode: ${item.episode_num}, resizeMode: contain`),
+          //console.log(`🎬 NON-OTT MODE (showOttOverlayControls=false) - Episode: ${item.episode_num}, resizeMode: contain`),
           <TouchableWithoutFeedback onPress={handleNonOttVideoPress}>
             <View
               style={[
@@ -347,11 +357,11 @@ export default function ShortVideoReelItem({
                 key={item.episode_id}
                 ref={videoRef}
                 source={{ uri: streamUrl }}
-                style={[StyleSheet.absoluteFill, { opacity: firstFrameReady ? 1 : 0 }]}
+                style={[StyleSheet.absoluteFill, { opacity: videoIsVisible ? 1 : 0 }]}
                 resizeMode="cover"
                 paused={paused}
                 rate={playbackRate}
-                repeat={true}
+                repeat={repeatPlayback}
                 controls={false}
                 selectedVideoTrack={firstFrameReady ? AUTO_VIDEO_TRACK : STARTUP_VIDEO_TRACK}
                 progressUpdateInterval={500}
@@ -438,13 +448,13 @@ export default function ShortVideoReelItem({
       ) : null}
 
       {/* Buffering spinner */}
-      {isActive && streamUrl && !isLocked && !firstFrameReady ? (
+      {showActiveBuffering ? (
         <View style={styles.bufferingOverlay}>
           <ActivityIndicator size="large" color={shortVideoTheme.crimson} />
         </View>
       ) : null}
 
-      {isActive && streamUrl && !isLocked && videoError ? (
+      {isActive && shouldRenderVideo && videoError ? (
         <View style={styles.errorOverlay}>
           <Text style={styles.errorOverlayText} numberOfLines={3}>{videoError}</Text>
         </View>

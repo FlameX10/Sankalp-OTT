@@ -78,7 +78,7 @@ export default function useShortVideoPlayback({
   }, [initialDuration, itemKey]);
 
   const onLoad = useCallback((data) => {
-    console.log(`✅ [useShortVideoPlayback] Video loaded - itemKey: ${itemKey}, duration: ${data.duration}s`);
+    //console.log(`✅ [useShortVideoPlayback] Video loaded - itemKey: ${itemKey}, duration: ${data.duration}s`);
     if (data.duration > 0) {
       setDuration(data.duration);
     }
@@ -157,7 +157,7 @@ export default function useShortVideoPlayback({
   }, [duration, onProgressUpdate, paused, showId, episodeId, accessToken]);
 
   const onReadyForDisplay = useCallback(() => {
-    console.log(`🎬 [useShortVideoPlayback] First frame ready, itemKey: ${itemKey}`);
+    //console.log(`🎬 [useShortVideoPlayback] First frame ready, itemKey: ${itemKey}`);
     setFirstFrameReady(true);
   }, [itemKey]);
 

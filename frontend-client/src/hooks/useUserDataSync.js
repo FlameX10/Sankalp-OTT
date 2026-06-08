@@ -5,25 +5,22 @@ import { patchUserProfile } from '../redux/slices/authSlice';
 import * as authService from '../services/authService';
 import { api } from '../services/api';
 
-const SYNC_INTERVAL = 200000; // Sync every 200 seconds (only when app is active)
+const SYNC_INTERVAL = 200000; // 200 seconds
 
 /**
  * useUserDataSync Hook
- * Periodically syncs user data (coins, plan, etc.) from backend
- * This ensures admin coin adjustments are reflected in real-time
- * 
- * Optimization: Only polls when app is in FOREGROUND
- * - Pauses polling when app goes to background
- * - Resumes polling when app returns to foreground
- * - Reduces server load and battery drain significantly
- * 
- * Features:
- * - Syncs immediately on mount
- * - Polls backend every 20 seconds (foreground only)
- * - AppState listener to pause/resume
- * - Silently handles errors (non-critical)
- * - Updates Redux and SecureStore
- * - Only runs when user is authenticated
+ * Periodically syncs user data (coins, plan, membership) from the backend.
+ * This is the SINGLE authorised caller of GET /auth/me in the app — PromoFlowGate
+ * reads plan/membership from the Redux state that this hook keeps fresh, so there
+ * is no duplicate polling.
+ *
+ * Behaviour:
+ * - Syncs immediately on mount (so UI is fresh right after login).
+ * - Polls every 200 seconds while the app is in the foreground.
+ * - Pauses the interval when the app goes to background (saves battery & server load).
+ * - Fires one immediate sync when the app returns to foreground, then resumes interval.
+ * - On 401, clears the interval and stops polling (user will be logged out by auth layer).
+ * - Only runs while accessToken is present.
  */
 export function useUserDataSync() {
   const dispatch = useDispatch();
@@ -48,7 +45,7 @@ export function useUserDataSync() {
         });
 
         const user = response.data?.data;
-        
+
         const patch = {};
         if (typeof user?.coins === 'number') patch.coins = user.coins;
         if (user?.plan !== undefined) patch.plan = user.plan;
@@ -69,23 +66,21 @@ export function useUserDataSync() {
       }
     };
 
-    // Start polling immediately on mount
+    // Sync immediately on mount, then start the interval
     syncUserData();
     intervalRef.current = setInterval(syncUserData, SYNC_INTERVAL);
 
     // ─────────────────────────────────────────────────────────────────
-    // AppState listener: Pause polling when app goes to background
+    // AppState listener: pause polling when app goes to background
     // ─────────────────────────────────────────────────────────────────
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       const isActive = appStateRef.current.match(/inactive|background/) === null;
       const nextIsActive = nextAppState.match(/inactive|background/) === null;
 
-      // App is going to foreground
+      // App is returning to foreground
       if (!isActive && nextIsActive) {
         console.log('[useUserDataSync] App in foreground - resuming polling');
-        // Sync immediately when app comes to foreground
         syncUserData();
-        // Resume polling
         if (!intervalRef.current) {
           intervalRef.current = setInterval(syncUserData, SYNC_INTERVAL);
         }
@@ -93,7 +88,6 @@ export function useUserDataSync() {
       // App is going to background
       else if (isActive && !nextIsActive) {
         console.log('[useUserDataSync] App in background - pausing polling');
-        // Clear interval to save battery and reduce API calls
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
           intervalRef.current = null;

@@ -191,7 +191,7 @@ services:
     # Raised from 1gb → 8gb. noeviction → allkeys-lru so Redis never
     # returns errors when memory is full; it evicts the least-recently-used
     # keys instead. BullMQ job queues are safe — active jobs are not evicted.
-    command: redis-server --maxmemory 8gb --maxmemory-policy allkeys-lru
+    command: redis-server --maxmemory 8gb --maxmemory-policy noeviction
 
     volumes:
       - redis_data:/data

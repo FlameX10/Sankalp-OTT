@@ -266,6 +266,7 @@ export default function ShowPlayerScreen({ navigation }) {
           <ShortVideoReelItem
             item={item}
             isActive={index === currentIndex && isFocused}
+            shouldPreload={index === currentIndex + 1}
             isFocused={isFocused}
             streamBase=""
             itemHeight={itemHeight}
@@ -275,6 +276,7 @@ export default function ShowPlayerScreen({ navigation }) {
               fromHome ? { fromHome: true } : fromForYou ? { fromForYou: true } : null
             }
             showEpisodeStrip={dramaSheetSource === 'forYou'}
+            repeatPlayback={false}
             // Seek to saved progress on first render of the starting episode
             initialSeekSec={
               index === startIndex && !hasSeenRef.current

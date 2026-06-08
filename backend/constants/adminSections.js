@@ -17,9 +17,6 @@ export const ADMIN_SECTIONS = [
   'cms',
 ];
 
-/** Dashboard is always granted to sub-admins */
-export const DEFAULT_SUB_ADMIN_SECTIONS = ['dashboard'];
-
 export const SECTION_LABELS = {
   dashboard: 'Dashboard',
   users: 'User Management',
@@ -42,7 +39,6 @@ export function isValidSection(section) {
 export function normalizeSections(sections) {
   // Sub-admins cannot be granted roles management (main admin only)
   const unique = [...new Set(sections.filter((s) => isValidSection(s) && s !== 'roles'))];
-  if (!unique.includes('dashboard')) unique.unshift('dashboard');
   return unique;
 }
 

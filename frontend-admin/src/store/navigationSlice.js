@@ -1,13 +1,16 @@
 import { createSlice } from '@reduxjs/toolkit'
 
+const STORAGE_KEY = 'admin_active_page'
+
 const navigationSlice = createSlice({
   name: 'navigation',
   initialState: {
-    activePage: 'dashboard',
+    activePage: localStorage.getItem(STORAGE_KEY) || 'dashboard',
   },
   reducers: {
     setActivePage(state, action) {
       state.activePage = action.payload
+      localStorage.setItem(STORAGE_KEY, action.payload)
     },
   },
 })

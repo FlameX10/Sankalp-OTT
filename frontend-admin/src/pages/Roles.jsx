@@ -11,7 +11,7 @@ function AdminModal({ open, onClose, onSave, initial, saving }) {
   const isEdit = !!initial?.id
   const isMainAdmin = initial?.role === 'admin'
   const [form, setForm] = useState(
-    initial || { name: '', email: '', password: '', role: 'sub_admin', status: 'Active', sections: ['dashboard'] }
+    initial || { name: '', email: '', password: '', role: 'sub_admin', status: 'Active', sections: [] }
   )
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -19,7 +19,7 @@ function AdminModal({ open, onClose, onSave, initial, saving }) {
   useEffect(() => {
     if (open) {
       setForm(
-        initial || { name: '', email: '', password: '', role: 'sub_admin', status: 'Active', sections: ['dashboard'] }
+        initial || { name: '', email: '', password: '', role: 'sub_admin', status: 'Active', sections: [] }
       )
       setError('')
       setShowPassword(false)
@@ -28,7 +28,6 @@ function AdminModal({ open, onClose, onSave, initial, saving }) {
 
   const upd = (k, v) => setForm((p) => ({ ...p, [k]: v }))
   const toggleSection = (id) => {
-    if (id === 'dashboard') return
     setForm((p) => ({
       ...p,
       sections: p.sections.includes(id) ? p.sections.filter((x) => x !== id) : [...p.sections, id],
@@ -43,6 +42,10 @@ function AdminModal({ open, onClose, onSave, initial, saving }) {
     }
     if (!isEdit && (!form.password || form.password.length < 8)) {
       setError('Password must be at least 8 characters')
+      return
+    }
+    if (!isMainAdmin && (!form.sections || form.sections.length === 0)) {
+      setError('At least one section must be selected')
       return
     }
     try {
@@ -148,7 +151,7 @@ function AdminModal({ open, onClose, onSave, initial, saving }) {
           <div style={{ fontSize: 12, color: 'var(--text3)' }}>
             {isMainAdmin
               ? 'Admin has full access to all sections. This cannot be changed.'
-              : 'Sub-admins can only access sections you enable below.'}
+              : 'Sub-admins can only access sections you enable below. At least one section is required.'}
           </div>
         </div>
         {!isMainAdmin && (
@@ -171,16 +174,16 @@ function AdminModal({ open, onClose, onSave, initial, saving }) {
                   gap: 10,
                   padding: '8px 12px',
                   borderRadius: 6,
-                  cursor: id === 'dashboard' ? 'default' : 'pointer',
+                  cursor: 'pointer',
                   background: form.sections.includes(id) ? 'var(--accent-bg)' : 'var(--bg3)',
                   border: `1px solid ${form.sections.includes(id) ? 'var(--accent-border)' : 'var(--border)'}`,
-                  opacity: id === 'dashboard' ? 0.6 : 1,
+
                 }}
               >
                 <Toggle
                   on={form.sections.includes(id)}
                   onChange={() => toggleSection(id)}
-                  disabled={id === 'dashboard'}
+
                 />
                 <span
                   style={{
@@ -195,7 +198,7 @@ function AdminModal({ open, onClose, onSave, initial, saving }) {
             ))}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 10 }}>
-            Dashboard is always enabled. Selected: {form.sections.length} of {SECTION_OPTIONS.length} sections.
+            Selected: {form.sections.length} of {SECTION_OPTIONS.length} sections.
           </div>
         </ModalSection>
       )}

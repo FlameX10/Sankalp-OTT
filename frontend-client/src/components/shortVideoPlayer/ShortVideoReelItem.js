@@ -37,7 +37,7 @@ import { unlockEpisode } from '../../redux/slices/showPlayerSlice';
 import { usePlaybackSpeed } from '../../context/PlaybackSpeedContext';
 import { useGuestAuth } from '../../context/GuestAuthContext';
 
-const STARTUP_VIDEO_TRACK = { type: 'resolution', value: 720 };
+const STARTUP_VIDEO_TRACK = { type: 'resolution', value: 480 };
 const AUTO_VIDEO_TRACK = { type: 'auto' };
 
 function DefaultTopOverlay({ top, style }) {

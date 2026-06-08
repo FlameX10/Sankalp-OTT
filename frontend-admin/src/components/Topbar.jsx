@@ -20,6 +20,7 @@ export default function Topbar() {
     // Clear localStorage first so axios interceptor sees no token immediately
     localStorage.removeItem('admin_token')
     localStorage.removeItem('admin_user')
+    localStorage.removeItem('admin_active_page')
     dispatch(logout())
     setShowMenu(false)
   }
@@ -128,4 +129,3 @@ export default function Topbar() {
     </header>
   )
 }
-//

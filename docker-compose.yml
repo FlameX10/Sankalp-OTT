@@ -24,10 +24,21 @@ services:
 
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Persist the HLS segment cache across nginx restarts.
+      # Remove this volume line if you prefer a cold cache on restart.
+      - nginx_hls_cache:/var/cache/nginx/hls
 
     depends_on:
       - admin
       - backend
+
+    # Nginx is I/O-bound (proxying + cache reads), 1 core is plenty.
+    # worker_processes auto inside nginx.conf uses all allocated CPUs.
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1g
 
     restart: unless-stopped
     logging: *default-logging
@@ -35,6 +46,12 @@ services:
   admin:
     build: ./frontend-admin
     container_name: ott-admin
+
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512m
 
     restart: unless-stopped
     logging: *default-logging
@@ -47,8 +64,13 @@ services:
       [
         "sh",
         "-c",
-        "npx prisma migrate deploy && npx prisma generate && node --watch server.js"
+        "npx prisma migrate deploy && npx prisma generate && node server.js"
       ]
+      # NOTE: removed --watch (not suitable for production/shared server).
+      # Use PM2 outside Docker for clustering:
+      #   pm2 start server.js -i 4 --name ott-backend
+      # OR set MANUAL_CLUSTER=true + CLUSTER_WORKERS=4 below to let
+      # server.js manage its own workers inside the container.
 
     volumes:
       - ./backend:/app
@@ -62,7 +84,15 @@ services:
 
     environment:
       - PORT=3000
-      - NODE_ENV=development
+      - NODE_ENV=production
+
+      # ── Cluster config ──────────────────────────────────────────
+      # Set MANUAL_CLUSTER=true to let server.js fork 4 worker
+      # processes inside this container (uses ~4 cores).
+      # Set to false if you're using PM2 outside Docker instead.
+      - MANUAL_CLUSTER=true
+      - CLUSTER_WORKERS=4
+
       - REDIS_URL=redis://redis:6379
       - MINIO_ENDPOINT=minio
       - MINIO_PORT=9000
@@ -77,6 +107,15 @@ services:
       - postgres
       - redis
       - minio
+
+    # 4 Node workers + occasional overhead — capped at 4.5 cores.
+    # Raise to 6.0 if you want headroom for burst traffic and your
+    # other hosted apps are not latency-sensitive.
+    deploy:
+      resources:
+        limits:
+          cpus: '4.5'
+          memory: 4g
 
     restart: unless-stopped
     logging: *default-logging
@@ -92,7 +131,7 @@ services:
       - ./backend/.env.docker
 
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - DATABASE_URL=postgresql://ottdev:ottdev123@postgres:5432/ott_dev
       - REDIS_URL=redis://redis:6379
       - MINIO_ENDPOINT=minio
@@ -108,6 +147,15 @@ services:
       - postgres
       - redis
       - minio
+
+    # FFmpeg is CPU-heavy. 3 cores handles concurrency:2 jobs
+    # with room for one profile to burst. Raise to 4.0 if you
+    # increase worker concurrency to 4 later.
+    deploy:
+      resources:
+        limits:
+          cpus: '3.0'
+          memory: 8g    # transcode worker downloads full video to /tmp
 
     restart: unless-stopped
     logging: *default-logging
@@ -127,6 +175,12 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
 
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 4g
+
     restart: unless-stopped
     logging: *default-logging
 
@@ -134,10 +188,19 @@ services:
     image: redis:7-alpine
     container_name: ott-redis
 
-    command: redis-server --maxmemory 1gb --maxmemory-policy noeviction
+    # Raised from 1gb → 8gb. noeviction → allkeys-lru so Redis never
+    # returns errors when memory is full; it evicts the least-recently-used
+    # keys instead. BullMQ job queues are safe — active jobs are not evicted.
+    command: redis-server --maxmemory 8gb --maxmemory-policy allkeys-lru
 
     volumes:
       - redis_data:/data
+
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 9g    # slightly above maxmemory to give Redis OS overhead
 
     restart: unless-stopped
     logging: *default-logging
@@ -160,6 +223,12 @@ services:
     volumes:
       - minio_data:/data
 
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 8g
+
     restart: unless-stopped
     logging: *default-logging
 
@@ -179,6 +248,12 @@ services:
     depends_on:
       - postgres
 
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512m
+
     restart: unless-stopped
     logging: *default-logging
 
@@ -186,3 +261,4 @@ volumes:
   pg_data:
   redis_data:
   minio_data:
+  nginx_hls_cache:    # persistent nginx HLS cache

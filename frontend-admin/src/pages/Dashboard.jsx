@@ -5,7 +5,7 @@ import {
 } from 'recharts'
 import api from '../services/api'
 
-const PERIODS = ['Daily', 'Weekly', 'Monthly', 'Annual', 'All']
+const PERIODS = ['Today', 'Weekly', 'Monthly', 'Annual', 'All']
 
 // 9 cards: Total Revenue, Membership Revenue, Top-Up Revenue, Total Users, Active Subscriptions, Dramas Uploaded, Coins Earned, Coins Spent, Check-ins
 const metricIcons = [DollarSign, CreditCard, Wallet, Users, CreditCard, Film, Coins, Coins, AlertTriangle]
@@ -69,7 +69,7 @@ function ShowsTooltip({ active, payload, label }) {
 const BAR_COLORS = ['var(--accent)', 'var(--blue)', 'var(--green)', '#a78bfa', '#f472b6']
 
 export default function Dashboard() {
-  const [period, setPeriod] = useState('Daily')
+  const [period, setPeriod] = useState('Today')
   const [metrics, setMetrics] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -155,33 +155,60 @@ export default function Dashboard() {
       )}
 
       {/* Metrics grid */}
-      {!loading && metrics.length > 0 && (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
-          {metrics.map((m, i) => {
-            const Icon = metricIcons[i] || Users
-            return (
-              <div key={m.label} className="metric-card" style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-                  <div className="metric-label">{m.label}</div>
-                  <div style={{ width:28,height:28,borderRadius:6,background:'var(--bg4)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
-                    <Icon size={13} color="var(--text3)"/>
+      {!loading && metrics.length > 0 && (() => {
+        // Swap row 1 (Revenue, indices 0-2) with row 2 (Users/Subs/Dramas, indices 3-5)
+        // New order: [3-5] Users row, [0-2] Revenue row, [6-8] Coins/Checkins row
+        const reordered = [
+          ...metrics.slice(3, 6),
+          ...metrics.slice(0, 3),
+          ...metrics.slice(6, 9),
+        ]
+        // Map reordered index back to original for icons
+        const origIndexMap = [3,4,5, 0,1,2, 6,7,8]
+        return (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
+            {reordered.map((m, i) => {
+              const Icon = metricIcons[origIndexMap[i]] || Users
+              const isHighlighted = i >= 3 // new rows 2 and 3 change with filters
+              return (
+                <div key={m.label} className="metric-card" style={{
+                  display:'flex', flexDirection:'column', gap:4,
+                  ...(i < 3 ? {
+                    border: '1px solid rgba(220,20,60,0.5)',
+                    boxShadow: '0 0 0 1px rgba(220,20,60,0.12), 0 2px 14px rgba(220,20,60,0.14)',
+                    background: 'linear-gradient(135deg, rgba(220,20,60,0.09) 0%, rgba(180,20,40,0.06) 100%)',
+                  } : isHighlighted ? {
+                    border: '1px solid rgba(168,85,247,0.5)',
+                    boxShadow: '0 0 0 1px rgba(168,85,247,0.12), 0 2px 14px rgba(168,85,247,0.14)',
+                    background: 'linear-gradient(135deg, rgba(168,85,247,0.09) 0%, rgba(99,102,241,0.06) 100%)',
+                  } : {})
+                }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                    <div className="metric-label">{m.label}</div>
+                    <div style={{
+                      width:28, height:28, borderRadius:6,
+                      background: i < 3 ? 'rgba(220,20,60,0.2)' : isHighlighted ? 'rgba(168,85,247,0.2)' : 'var(--bg4)',
+                      display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0
+                    }}>
+                      <Icon size={13} color={i < 3 ? '#f87171' : isHighlighted ? '#c084fc' : 'var(--text3)'}/>
+                    </div>
+                  </div>
+                  <div className="metric-value" style={{ fontSize:20 }}>{m.value}</div>
+                  <div className="metric-sub">
+                    <span>{m.sub}</span>
+                    {m.trend && (
+                      <span style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:3, color:m.up===false?'var(--red)':m.up?'var(--green)':'var(--text3)', fontFamily:'var(--mono)', fontSize:11 }}>
+                        {m.up===true?<TrendingUp size={10}/>:m.up===false?<TrendingDown size={10}/>:null}
+                        {m.trend}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className="metric-value" style={{ fontSize:20 }}>{m.value}</div>
-                <div className="metric-sub">
-                  <span>{m.sub}</span>
-                  {m.trend && (
-                    <span style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:3, color:m.up===false?'var(--red)':m.up?'var(--green)':'var(--text3)', fontFamily:'var(--mono)', fontSize:11 }}>
-                      {m.up===true?<TrendingUp size={10}/>:m.up===false?<TrendingDown size={10}/>:null}
-                      {m.trend}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+              )
+            })}
+          </div>
+        )
+      })()}
 
       {/* Empty state */}
       {!loading && metrics.length === 0 && !error && (

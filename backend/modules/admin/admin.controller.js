@@ -384,7 +384,7 @@ export async function getCoinMetrics(req, res, next) {
       issuedTotal: (issuedTotal._sum.amount || 0).toLocaleString('en-IN'),
       purchasedTotal: (purchasedTotal._sum.amount || 0).toLocaleString('en-IN'),
       spentTotal: (spentTotal._sum.coins_spent || 0).toLocaleString('en-IN'),
-      balanceInWallets: (totalInCirculation - (spentTotal._sum.coins_spent || 0)).toLocaleString('en-IN'),
+      balanceInWallets: totalInCirculation.toLocaleString('en-IN'),
     };
 
     return res.json(new ApiResponse(200, { metrics }, 'Coin metrics fetched successfully'));

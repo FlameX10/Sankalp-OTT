@@ -27,6 +27,8 @@ services:
       # Persist the HLS segment cache across nginx restarts.
       # Remove this volume line if you prefer a cold cache on restart.
       - nginx_hls_cache:/var/cache/nginx/hls
+      # Persist the thumbnail/banner cache across nginx restarts.
+      - nginx_image_cache:/var/cache/nginx/images
 
     depends_on:
       - admin
@@ -188,9 +190,6 @@ services:
     image: redis:7-alpine
     container_name: ott-redis
 
-    # Raised from 1gb → 8gb. noeviction → allkeys-lru so Redis never
-    # returns errors when memory is full; it evicts the least-recently-used
-    # keys instead. BullMQ job queues are safe — active jobs are not evicted.
     command: redis-server --maxmemory 8gb --maxmemory-policy noeviction
 
     volumes:
@@ -262,3 +261,4 @@ volumes:
   redis_data:
   minio_data:
   nginx_hls_cache:    # persistent nginx HLS cache
+  nginx_image_cache:  # persistent nginx thumbnail/banner cache

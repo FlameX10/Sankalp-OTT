@@ -257,6 +257,16 @@ export const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+  qualityRowTextWrap: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  qualityRowDescription: {
+    color: 'rgba(255,255,255,0.58)',
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 3,
+  },
 
   ottChromeRoot: {
     ...StyleSheet.absoluteFillObject,
@@ -298,6 +308,9 @@ export const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.28)',
+  },
+  qualityChipTop: {
+    marginRight: 8,
   },
   ottCenterWrap: {
     ...StyleSheet.absoluteFillObject,

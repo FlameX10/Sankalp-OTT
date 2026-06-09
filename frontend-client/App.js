@@ -3,6 +3,7 @@ import { Provider } from 'react-redux';
 
 import RootStackNavigator from './src/navigation/RootStackNavigator';
 import { PlaybackSpeedProvider } from './src/context/PlaybackSpeedContext';
+import { VideoQualityProvider } from './src/context/VideoQualityContext';
 import { store } from './src/redux';
 import { setStore, setAuthActions } from './src/services/api';
 import { setTokens, logout } from './src/redux/slices/authSlice';
@@ -27,9 +28,11 @@ export default function App() {
   return (
     <Provider store={store}>
       <PlaybackSpeedProvider>
-        {/* "light" keeps status bar text/icons white on the dark app background */}
-        <StatusBar style="light" />
-        <RootStackNavigator />
+        <VideoQualityProvider>
+          {/* "light" keeps status bar text/icons white on the dark app background */}
+          <StatusBar style="light" />
+          <RootStackNavigator />
+        </VideoQualityProvider>
       </PlaybackSpeedProvider>
     </Provider>
   );

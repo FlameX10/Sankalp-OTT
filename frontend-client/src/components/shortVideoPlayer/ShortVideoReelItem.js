@@ -35,6 +35,7 @@ import {
 } from '../../redux/slices/myListSlice';
 import { unlockEpisode } from '../../redux/slices/showPlayerSlice';
 import { usePlaybackSpeed } from '../../context/PlaybackSpeedContext';
+import { useVideoQuality } from '../../context/VideoQualityContext';
 import { useGuestAuth } from '../../context/GuestAuthContext';
 
 const STARTUP_VIDEO_TRACK = { type: 'resolution', value: 480 };
@@ -77,7 +78,15 @@ export default function ShortVideoReelItem({
   const isBookmarked = useSelector(selectIsBookmarked(item.show_id));
   const bookmarksLoaded = useSelector(selectBookmarksLoaded);
   const { speed: playbackRate, setSpeed, speeds: speedOptions } = usePlaybackSpeed();
+  const {
+    quality,
+    setQuality,
+    options: qualityOptions,
+    maxBitRate,
+    activeLabel: qualityLabel,
+  } = useVideoQuality();
   const [speedModalVisible, setSpeedModalVisible] = useState(false);
+  const [qualityModalVisible, setQualityModalVisible] = useState(false);
   const [videoError, setVideoError] = useState(null);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [controlsInteractionTick, setControlsInteractionTick] = useState(0);
@@ -332,6 +341,7 @@ export default function ShortVideoReelItem({
               repeat={repeatPlayback}
               controls={false}
               selectedVideoTrack={firstFrameReady ? AUTO_VIDEO_TRACK : STARTUP_VIDEO_TRACK}
+              maxBitRate={maxBitRate}
               progressUpdateInterval={500}
               onLoad={wrappedOnLoad}
               onProgress={onProgress}
@@ -364,6 +374,7 @@ export default function ShortVideoReelItem({
                 repeat={repeatPlayback}
                 controls={false}
                 selectedVideoTrack={firstFrameReady ? AUTO_VIDEO_TRACK : STARTUP_VIDEO_TRACK}
+                maxBitRate={maxBitRate}
                 progressUpdateInterval={500}
                 onLoad={wrappedOnLoad}
                 onProgress={onProgress}
@@ -403,6 +414,13 @@ export default function ShortVideoReelItem({
         <View style={styles.ottChromeRoot} pointerEvents="box-none">
           <View style={[styles.ottTopBar, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
             <View style={{ flex: 1 }} />
+            <Pressable
+              style={[styles.speedChipTop, styles.qualityChipTop]}
+              onPress={() => setQualityModalVisible(true)}
+              hitSlop={10}
+            >
+              <Text style={styles.speedChipText}>{qualityLabel}</Text>
+            </Pressable>
             {showPlaybackSpeedControl ? (
               <Pressable
                 style={styles.speedChipTop}
@@ -483,6 +501,13 @@ export default function ShortVideoReelItem({
 
           <View style={[styles.ottTopBar, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
             <View style={{ flex: 1 }} />
+            <Pressable
+              style={[styles.speedChipTop, styles.qualityChipTop]}
+              onPress={() => setQualityModalVisible(true)}
+              hitSlop={10}
+            >
+              <Text style={styles.speedChipText}>{qualityLabel}</Text>
+            </Pressable>
             {showPlaybackSpeedControl ? (
               <Pressable
                 style={styles.speedChipTop}
@@ -552,6 +577,47 @@ export default function ShortVideoReelItem({
             </Pressable>
           </Modal>
       ) : null}
+
+      <Modal
+        visible={qualityModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setQualityModalVisible(false)}
+      >
+        <Pressable style={styles.speedModalBackdrop} onPress={() => setQualityModalVisible(false)}>
+          <Pressable style={styles.speedModalCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.speedModalTitle}>Video quality</Text>
+            {qualityOptions.map((opt) => (
+              <Pressable
+                key={opt.id}
+                style={[
+                  styles.speedRow,
+                  quality === opt.id && styles.speedRowActive,
+                ]}
+                onPress={() => {
+                  setQuality(opt.id);
+                  setQualityModalVisible(false);
+                }}
+              >
+                <View style={styles.qualityRowTextWrap}>
+                  <Text style={[
+                    styles.speedRowText,
+                    quality === opt.id && styles.speedRowTextActive,
+                  ]}>
+                    {opt.label}
+                  </Text>
+                  <Text style={styles.qualityRowDescription}>
+                    {opt.description}
+                  </Text>
+                </View>
+                {quality === opt.id ? (
+                  <Ionicons name="checkmark" size={20} color={shortVideoTheme.crimson} />
+                ) : null}
+              </Pressable>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Animated.View
           style={[

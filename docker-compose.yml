@@ -40,7 +40,7 @@ services:
       resources:
         limits:
           cpus: '1.0'
-          memory: 1g
+          memory: 50g
 
     restart: unless-stopped
     logging: *default-logging
@@ -251,7 +251,7 @@ services:
       resources:
         limits:
           cpus: '0.5'
-          memory: 512m
+          memory: 1g
 
     restart: unless-stopped
     logging: *default-logging

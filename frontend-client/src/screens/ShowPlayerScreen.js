@@ -266,7 +266,7 @@ export default function ShowPlayerScreen({ navigation }) {
           <ShortVideoReelItem
             item={item}
             isActive={index === currentIndex && isFocused}
-            shouldPreload={index === currentIndex + 1}
+            shouldPreload={Math.abs(index - currentIndex) === 1}
             isFocused={isFocused}
             streamBase=""
             itemHeight={itemHeight}

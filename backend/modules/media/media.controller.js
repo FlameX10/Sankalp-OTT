@@ -51,7 +51,10 @@ async function confirmImageUpload(req, res, next) {
 
 async function getPlayUrl(req, res, next) {
   try {
-    const result = await mediaService.getPlayUrl(req.params.episodeId);
+    const result = await mediaService.getPlayUrl(req.params.episodeId, {
+      userId: req.user?.id || null,
+      isGuest: req.isGuest || false,
+    });
     res.json(result);
   } catch (e) { next(e); }
 }

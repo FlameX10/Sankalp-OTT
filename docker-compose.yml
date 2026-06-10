@@ -102,8 +102,10 @@ services:
       - MINIO_SECRET_KEY=minioadmin123
       - MINIO_BUCKET=ott-media
       - MINIO_USE_SSL=false
-      - MINIO_PUBLIC_HOST=http://${LOCAL_IP}:9000
+      - MINIO_PUBLIC_HOST=http://${LOCAL_IP}:8080
       - SERVER_ORIGIN=http://${LOCAL_IP}:8080
+      - HLS_SIGNING_SECRET=ott-dev-hls-signing-secret-change-me
+      - HLS_SIGNED_URL_TTL=7200
 
     depends_on:
       - postgres
@@ -142,7 +144,7 @@ services:
       - MINIO_SECRET_KEY=minioadmin123
       - MINIO_BUCKET=ott-media
       - MINIO_USE_SSL=false
-      - MINIO_PUBLIC_HOST=http://${LOCAL_IP}:9000
+      - MINIO_PUBLIC_HOST=http://${LOCAL_IP}:8080
       - SERVER_ORIGIN=http://${LOCAL_IP}:8080
 
     depends_on:
@@ -217,7 +219,7 @@ services:
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin123
-      MINIO_API_CORS_ALLOW_ORIGIN: "http://${LOCAL_IP},http://${LOCAL_IP}:8080,http://localhost,http://localhost:80,http://localhost:8080"
+      MINIO_API_CORS_ALLOW_ORIGIN: "http://${LOCAL_IP},http://${LOCAL_IP}:8080,http://localhost,http://localhost:80,http://localhost:8080,http://${LOCAL_IP}:9000"
 
     volumes:
       - minio_data:/data

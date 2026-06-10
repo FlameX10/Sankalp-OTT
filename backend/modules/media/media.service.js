@@ -1,7 +1,9 @@
 import fs from 'fs';
 import { prisma } from '../../prisma/client.js';
 import { createTranscodeJobs } from '../../producer.js';
-import { getPresignedPutUrl, getPresignedGetUrl, getPublicUrl } from '../../utils/presigned-url.js';
+import { getPresignedPutUrl, getPublicUrl } from '../../utils/presigned-url.js';
+import { getSignedEpisodeHlsPath } from '../../utils/hls-signed-url.js';
+import { checkEpisodeAccess } from '../user/episode-access.service.js';
 import { AppError } from '../../middleware/error.middleware.js';
 import minioClient from '../../config/minio.js';
 import config from '../../config/index.js';
@@ -115,18 +117,19 @@ async function confirmImageUpload(type, entityId, objectName) {
 }
 
 // Get presigned streaming URL for an episode
-async function getPlayUrl(episodeId) {
+async function getPlayUrl(episodeId, { userId = null, isGuest = false } = {}) {
   const episode = await prisma.episode.findUnique({ where: { id: episodeId } });
   if (!episode) throw new AppError('Episode not found', 404);
   if (!episode.hls_master_url) throw new AppError('Video not available yet', 404);
   if (episode.status !== 'ready') throw new AppError(`Video is ${episode.status}`, 400);
 
-  // For HLS, we need to serve the master.m3u8 and make segments accessible
-  // Generate presigned URL for master playlist
-  const masterUrl = await getPresignedGetUrl(episode.hls_master_url, 7200);
+  const access = await checkEpisodeAccess(userId, isGuest, episode.id, episode.is_free);
+  if (access.is_locked) {
+    throw new AppError('Episode is locked', 403);
+  }
 
   return {
-    stream_url: masterUrl,
+    stream_url: getSignedEpisodeHlsPath(episode),
     duration_sec: episode.duration_sec,
     episode_id: episode.id,
     episode_num: episode.episode_num,

@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "7k",
-    "slug": "7k",
-    "scheme": "7k",
+    "name": "7K",
+    "slug": "7K",
+    "scheme": "7K",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
@@ -73,9 +73,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "5dd61ee9-e865-46d2-bda6-9064e3107aa3"
+        "projectId": "f9ed04e7-7f6c-4719-9e85-7c70da9e6154"
       }
     },
-    "owner": "prasen_10"
+    "owner": "vishnu2125"
   }
 }

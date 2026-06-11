@@ -223,6 +223,16 @@ export const mediaApi = {
     api.post('/media/confirm/video', { episode_id: episodeId }),
   confirmImage: (type, entityId, objectName) =>
     api.post('/media/confirm/image', { type, entity_id: entityId, object_name: objectName }),
+  uploadImageFile: (type, entityId, file) => {
+    const formData = new FormData();
+    formData.append('type', type);
+    formData.append('entity_id', entityId);
+    formData.append('image', file);
+
+    return uploadApi.post('/media/upload/image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   // Upload a file directly to MinIO using a presigned PUT URL
   uploadToMinio: (presignedUrl, file) =>
     fetch(presignedUrl, {

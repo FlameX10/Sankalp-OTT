@@ -48,7 +48,10 @@ app.use(cookieParser());
 
 // CORS: reads SERVER_ORIGIN from env so it works for any machine IP without code changes.
 // Always also allows localhost so local dev never breaks.
+// CF_ORIGIN is the Cloudflare-proxied public domain (https://ventaott.com).
+// Kept separate from SERVER_ORIGIN so switching CF on/off only touches the env.
 const SERVER_ORIGIN = process.env.SERVER_ORIGIN || 'http://localhost';
+const CF_ORIGIN = process.env.CF_ORIGIN || null;
 
 app.use(cors({
   origin: [
@@ -56,6 +59,7 @@ app.use(cors({
     `${SERVER_ORIGIN}:80`,
     `${SERVER_ORIGIN}:5173`,
     `${SERVER_ORIGIN}:3000`,
+    CF_ORIGIN,                   // e.g. https://ventaott.com (set in .env.docker)
     'http://localhost',
     'http://localhost:80',
     'http://localhost:5173',

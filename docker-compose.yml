@@ -104,7 +104,7 @@ services:
       - MINIO_USE_SSL=false
       - MINIO_PUBLIC_HOST=http://${LOCAL_IP}:8080
       - SERVER_ORIGIN=http://${LOCAL_IP}:8080
-      - HLS_SIGNING_SECRET=ott-dev-hls-signing-secret-change-me
+      - HLS_SIGNING_SECRET=0cc3d9a7f14d3cfe6eb43055be850b6a066b57c6564416ae18dc16573c75a6d5
       - HLS_SIGNED_URL_TTL=7200
 
     depends_on:
@@ -219,7 +219,9 @@ services:
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin123
-      MINIO_API_CORS_ALLOW_ORIGIN: "http://${LOCAL_IP},http://${LOCAL_IP}:8080,http://localhost,http://localhost:80,http://localhost:8080,http://${LOCAL_IP}:9000"
+      MINIO_SERVER_URL: http://${LOCAL_IP}:8080
+      MINIO_BROWSER_REDIRECT_URL: http://${LOCAL_IP}:8080/minio-console
+      MINIO_API_CORS_ALLOW_ORIGIN: "http://${LOCAL_IP},http://${LOCAL_IP}:8080,http://localhost,http://localhost:80"
 
     volumes:
       - minio_data:/data

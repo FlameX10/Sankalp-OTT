@@ -318,6 +318,19 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 25,
   },
+  ottSeekRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 28,
+  },
+  ottSeekBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
   ottPlayPauseFab: {
     width: 76,
     height: 76,

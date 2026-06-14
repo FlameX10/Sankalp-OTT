@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Pressable,
   Keyboard,
+  Modal,
 } from 'react-native';
 import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,12 +22,21 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import CoinIcon from '../components/CoinIcon';
 import DramaDetailsSheetConnected from '../components/DramaDetailsSheetConnected';
+import HomeHeroSlider from '../components/home/HomeHeroSlider';
+import HomeShowSection from '../components/home/HomeShowSection';
+import { fetchHomeBanners } from '../components/home/homePromoApi';
 import { ROUTES } from '../constants/routes';
 import { theme } from '../constants/theme';
 import { clearPendingHomeBanner } from '../redux/slices/promoFlowSlice';
 import { API_BASE_URL } from '../constants/config';
 import { createAuthenticatedApi } from '../services/api';
 import { initShowPlayer } from '../redux/slices/showPlayerSlice';
+import {
+  fetchBookmarks,
+  fetchWatchHistory,
+  selectBookmarks,
+  selectWatchHistory,
+} from '../redux/slices/myListSlice';
 import {
   clearHomeDramaSheetSession,
   selectHomeDramaSheetSession,
@@ -69,14 +79,20 @@ const DramaCard = ({ item, onPress }) => (
         </View>
       )}
       <View style={styles.viewCountContainer}>
-        <Ionicons name="play" size={10} color="#fff" />
+        <Ionicons name="eye-outline" size={11} color="#fff" />
         <Text style={styles.viewCountText}>
           {formatViews(item.view_count || item.views)}
         </Text>
       </View>
     </View>
     <Text style={styles.dramaTitle} numberOfLines={2}>{item.title}</Text>
-    <Text style={styles.categoryText}>{item.category_name || item.category}</Text>
+    {item.tags?.length > 0 ? (
+      <Text style={styles.dramaTagsText} numberOfLines={1}>
+        {item.tags.join(' · ')}
+      </Text>
+    ) : (
+      <Text style={styles.categoryText}>{item.category_name || item.category}</Text>
+    )}
   </TouchableOpacity>
 );
 
@@ -109,6 +125,10 @@ export default function PopularScreen() {
   const reopenHomeSheet = useSelector(selectHomeReopenSheetAfterPlayer);
   const [dramaSheetKey, setDramaSheetKey] = useState(0);
   const pendingHomeBanner = useSelector(selectPendingHomeBanner);
+  const bookmarks = useSelector(selectBookmarks);
+  const watchHistory = useSelector(selectWatchHistory);
+  const [heroBanners, setHeroBanners] = useState([]);
+  const [expandedSection, setExpandedSection] = useState(null);
 
   const goToEarnRewards = () => {
     navigation.navigate(ROUTES.PROFILE, {
@@ -176,6 +196,19 @@ export default function PopularScreen() {
     return searchQuery.trim();
   }, [selectedTags, searchQuery]);
 
+  const isSearchActive = Boolean(effectiveSearch);
+  const trendingShows = useMemo(() => shows.slice(0, 5), [shows]);
+  const allShowsPreview = useMemo(() => shows.slice(0, 12), [shows]);
+
+  const expandedItems = useMemo(() => {
+    if (!expandedSection) return [];
+    if (expandedSection === 'all') return shows;
+    if (expandedSection === 'trending') return trendingShows;
+    if (expandedSection === 'continue') return watchHistory;
+    if (expandedSection === 'saved') return bookmarks;
+    return [];
+  }, [expandedSection, shows, trendingShows, watchHistory, bookmarks]);
+
   useEffect(() => {
     filterPanelOpenRef.current = filterPanelOpen;
   }, [filterPanelOpen]);
@@ -237,7 +270,6 @@ export default function PopularScreen() {
     try {
       const params = new URLSearchParams();
       params.set('status', 'Published');
-      if (activeTab) params.set('category_id', activeTab);
       params.set('page', '1');
       params.set('limit', '60');
       if (effectiveSearch) params.set('search', effectiveSearch);
@@ -252,7 +284,7 @@ export default function PopularScreen() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, effectiveSearch]);
+  }, [effectiveSearch]);
 
   useEffect(() => {
     loadShows();
@@ -261,7 +293,14 @@ export default function PopularScreen() {
   useFocusEffect(
     useCallback(() => {
       loadShows();
-    }, [loadShows])
+      fetchHomeBanners(5)
+        .then(setHeroBanners)
+        .catch(() => setHeroBanners([]));
+      if (accessToken) {
+        dispatch(fetchBookmarks());
+        dispatch(fetchWatchHistory());
+      }
+    }, [loadShows, accessToken, dispatch])
   );
 
   // Re-open drama sheet after returning from ShowPlayer (back, gesture, title, episodes)
@@ -400,6 +439,64 @@ export default function PopularScreen() {
     setSheetVisible(false);
     navigation.navigate(ROUTES.SHOW_PLAYER, { fromHome: true });
   };
+
+  const handleStartWatching = useCallback(() => {
+    if (!selected) return;
+    const episodes = showDetails?.show_id === selected.show_id
+      ? showDetails.episodes
+      : null;
+    const episode = episodes?.find((ep) => ep.status === 'ready' && !ep.is_locked)
+      || episodes?.[0];
+    if (episode && showDetails) {
+      handleEpisodePress(episode);
+      return;
+    }
+    dispatch(
+      initShowPlayer({
+        showId: selected.show_id,
+        showTitle: selected.show_title || selected.title,
+        thumbnailUrl: selected.thumbnail_url,
+        totalEpisodes: selected.total_episodes || 0,
+        seedEpisodes: [],
+        startEpisodeNum: 1,
+        streamBase: API_BASE_URL,
+      })
+    );
+    setSheetVisible(false);
+    navigation.navigate(ROUTES.SHOW_PLAYER, { fromHome: true });
+  }, [selected, showDetails, dispatch, navigation]);
+
+  const handleBannerPress = useCallback((banner) => {
+    if (!banner?.show_id) return;
+    openDetails({
+      id: banner.show_id,
+      title: banner.show_title || banner.title,
+      thumbnail_url: banner.show_thumbnail_url || banner.image_url,
+      synopsis: banner.show_synopsis,
+    });
+  }, [openDetails]);
+
+  const openMyListEntry = useCallback((entry) => {
+    dispatch(
+      initShowPlayer({
+        showId: entry.show_id,
+        showTitle: entry.show_title,
+        thumbnailUrl: entry.thumbnail_url,
+        totalEpisodes: entry.total_episodes || 1,
+        seedEpisodes: [{
+          episode_id: entry.episode_id,
+          episode_num: entry.episode_num,
+          duration_sec: entry.duration_sec || 0,
+          is_locked: false,
+          status: 'ready',
+        }],
+        startEpisodeNum: entry.episode_num,
+        streamBase: API_BASE_URL,
+        startProgressSec: entry.progress_sec || 0,
+      })
+    );
+    navigation.navigate(ROUTES.SHOW_PLAYER, { fromHome: true });
+  }, [dispatch, navigation]);
 
   const handleCloseSheet = () => {
     if (sheetHistory.length > 0) {
@@ -564,36 +661,132 @@ export default function PopularScreen() {
         </Pressable>
       )}
 
-      <View style={styles.tabContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
-          {tabs.map((tab) => (
-            <TouchableOpacity key={tab.id ?? 'all'} onPress={() => setActiveTab(tab.id)}>
-              <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>
-                {tab.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
       {loading && shows.length === 0 ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#FF2D55" />
         </View>
-      ) : (
+      ) : isSearchActive ? (
         <FlatList
           data={shows}
           renderItem={({ item }) => <DramaCard item={item} onPress={() => openDetails(item)} />}
-          keyExtractor={item => item.id.toString()}
+          keyExtractor={(item) => item.id.toString()}
           numColumns={3}
           contentContainerStyle={styles.listContent}
           columnWrapperStyle={styles.columnWrapper}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No dramas found in this category.</Text>
+            <Text style={styles.emptyText}>No dramas found.</Text>
           }
         />
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.homeScrollContent}
+        >
+          <HomeHeroSlider banners={heroBanners} onBannerPress={handleBannerPress} />
+
+          <HomeShowSection
+            title="All"
+            items={allShowsPreview}
+            onItemPress={(item) => openDetails(item)}
+            onExpand={() => setExpandedSection('all')}
+          />
+
+          <HomeShowSection
+            title="Trending"
+            items={trendingShows}
+            onItemPress={(item) => openDetails(item)}
+            onExpand={() => setExpandedSection('trending')}
+          />
+
+          {accessToken && watchHistory.length > 0 ? (
+            <HomeShowSection
+              title="Continue Watching"
+              items={watchHistory.map((entry) => ({
+                id: entry.history_id,
+                title: entry.show_title,
+                thumbnail_url: entry.thumbnail_url,
+                category: entry.category,
+                view_count: 0,
+                _entry: entry,
+              }))}
+              onItemPress={(item) => openMyListEntry(item._entry)}
+              onExpand={() => setExpandedSection('continue')}
+            />
+          ) : null}
+
+          {accessToken && bookmarks.length > 0 ? (
+            <HomeShowSection
+              title="Saved"
+              items={bookmarks.map((entry) => ({
+                id: entry.bookmark_id,
+                title: entry.show_title,
+                thumbnail_url: entry.thumbnail_url,
+                category: entry.category,
+                view_count: 0,
+                _entry: entry,
+              }))}
+              onItemPress={(item) => openMyListEntry(item._entry)}
+              onExpand={() => setExpandedSection('saved')}
+            />
+          ) : null}
+        </ScrollView>
       )}
+
+      <Modal
+        visible={Boolean(expandedSection)}
+        animationType="slide"
+        onRequestClose={() => setExpandedSection(null)}
+      >
+        <View style={[styles.expandModal, { paddingTop: insets.top }]}>
+          <View style={styles.expandHeader}>
+            <Text style={styles.expandTitle}>
+              {expandedSection === 'all' && 'All Dramas'}
+              {expandedSection === 'trending' && 'Trending'}
+              {expandedSection === 'continue' && 'Continue Watching'}
+              {expandedSection === 'saved' && 'Saved'}
+            </Text>
+            <TouchableOpacity onPress={() => setExpandedSection(null)} hitSlop={10}>
+              <Ionicons name="close" size={26} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={expandedItems}
+            keyExtractor={(item, index) => String(item.id || item.show_id || item.history_id || item.bookmark_id || index)}
+            numColumns={3}
+            contentContainerStyle={styles.listContent}
+            columnWrapperStyle={styles.columnWrapper}
+            renderItem={({ item }) => {
+              if (expandedSection === 'continue' || expandedSection === 'saved') {
+                const entry = item._entry || item;
+                return (
+                  <DramaCard
+                    item={{
+                      id: entry.show_id,
+                      title: entry.show_title,
+                      thumbnail_url: entry.thumbnail_url,
+                      category: entry.category,
+                    }}
+                    onPress={() => {
+                      setExpandedSection(null);
+                      openMyListEntry(entry);
+                    }}
+                  />
+                );
+              }
+              return (
+                <DramaCard
+                  item={item}
+                  onPress={() => {
+                    setExpandedSection(null);
+                    openDetails(item);
+                  }}
+                />
+              );
+            }}
+          />
+        </View>
+      </Modal>
 
       <DramaDetailsSheetConnected
         key={`drama-${dramaSheetKey}-${selected?.show_id ?? 'none'}`}
@@ -606,6 +799,7 @@ export default function PopularScreen() {
         onRangeChange={handleRangeChange}
         onEpisodePress={handleEpisodePress}
         onRelatedPress={handleRelatedPress}
+        onStartWatching={handleStartWatching}
         onClose={handleCloseSheet}
       />
     </View>
@@ -765,10 +959,32 @@ const styles = StyleSheet.create({
   posterImage: { width: '100%', height: '100%' },
   statusTag: { position: 'absolute', top: 0, right: 0, paddingHorizontal: 6, paddingVertical: 2, borderBottomLeftRadius: 4 },
   tagText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
-  viewCountContainer: { position: 'absolute', bottom: 5, right: 5, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  viewCountContainer: {
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
   viewCountText: { color: '#fff', fontSize: 10, fontWeight: '600' },
   dramaTitle: { color: '#FFF', fontSize: 13, marginTop: 8, fontWeight: '500', lineHeight: 18 },
+  dramaTagsText: { color: '#FFF', fontSize: 11, marginTop: 4, fontWeight: '800' },
   categoryText: { color: '#666', fontSize: 11, marginTop: 4 },
+  homeScrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
+  expandModal: { flex: 1, backgroundColor: '#000' },
+  expandHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  expandTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
   loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyText: { color: '#666', textAlign: 'center', marginTop: 50, fontSize: 16 },
   

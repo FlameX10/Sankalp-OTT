@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '../../constants/config';
 
-export async function fetchHomeBanners() {
-  const res = await fetch(`${API_BASE_URL}/api/content/home/banners`);
+export async function fetchHomeBanners(limit = 5) {
+  const res = await fetch(`${API_BASE_URL}/api/content/home/banners?limit=${limit}`);
   const data = await res.json();
   if (!res.ok) throw new Error(data?.message || 'Failed to load banners');
   return Array.isArray(data?.banners) ? data.banners : [];

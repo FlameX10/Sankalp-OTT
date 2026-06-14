@@ -344,6 +344,29 @@ router.get('/watch-history', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+/**
+ * DELETE /api/user/watch-history/:historyId
+ * Remove a watch history entry for the logged-in user.
+ */
+router.delete('/watch-history/:historyId', requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { historyId } = req.params;
+
+    const entry = await prisma.watchHistory.findFirst({
+      where: { id: historyId, user_id: userId },
+    });
+
+    if (!entry) {
+      return res.status(404).json(new ApiResponse(404, null, 'Watch history entry not found'));
+    }
+
+    await prisma.watchHistory.delete({ where: { id: historyId } });
+
+    return res.json(new ApiResponse(200, { history_id: historyId }, 'Watch history entry removed'));
+  } catch (e) { next(e); }
+});
+
 // ─────────────────────────────────────────────────────────────────
 // WALLET (Dynamic Top-up Plans from Database)
 // Coins are issued based on admin-configured top-up plans

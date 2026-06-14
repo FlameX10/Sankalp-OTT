@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -17,6 +17,7 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import {
   fetchTopUpOptions,
+  fetchWalletTransactions,
   packPlanSubtitle,
   packPlanTitle,
   simulatePurchase,
@@ -40,8 +41,27 @@ const WalletScreen = () => {
   const [selectedPack, setSelectedPack] = useState(null);
   const [purchasing, setPurchasing] = useState(false);
   const [purchaseError, setPurchaseError] = useState(null);
+  const [recentTx, setRecentTx] = useState([]);
+  const [recentTxLoading, setRecentTxLoading] = useState(false);
 
   const displayCoins = coins ?? 0;
+
+  const loadRecentTransactions = useCallback(async () => {
+    if (!accessToken) return;
+    setRecentTxLoading(true);
+    try {
+      const data = await fetchWalletTransactions(accessToken, { limit: 5, offset: 0 });
+      setRecentTx(Array.isArray(data?.items) ? data.items.slice(0, 5) : []);
+    } catch {
+      setRecentTx([]);
+    } finally {
+      setRecentTxLoading(false);
+    }
+  }, [accessToken]);
+
+  useEffect(() => {
+    loadRecentTransactions();
+  }, [loadRecentTransactions]);
 
   const loadTopUpOptions = useCallback(async () => {
     setPacksError(null);
@@ -110,6 +130,7 @@ const WalletScreen = () => {
       setSelectedPack(null);
 
       Alert.alert('Success', 'Coins have been added to your wallet.');
+      loadRecentTransactions();
     } catch (err) {
       const msg =
         err?.response?.data?.message ||
@@ -145,6 +166,29 @@ const WalletScreen = () => {
           <Text style={styles.listItemText}>Transaction History</Text>
           <Ionicons name="chevron-forward" size={20} color="#666" />
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.recentTxSection}>
+        <Text style={styles.recentTxTitle}>Recent Transactions</Text>
+        {recentTxLoading ? (
+          <ActivityIndicator color="#FF2D55" style={{ marginVertical: 12 }} />
+        ) : recentTx.length === 0 ? (
+          <Text style={styles.recentTxEmpty}>No transactions yet</Text>
+        ) : (
+          recentTx.map((tx) => {
+            const isCredit = tx.type?.toLowerCase() === 'credit';
+            return (
+              <View key={tx.id} style={styles.recentTxRow}>
+                <Text style={styles.recentTxLabel} numberOfLines={1}>
+                  {tx.title || tx.reason || 'Transaction'}
+                </Text>
+                <Text style={[styles.recentTxAmount, isCredit ? styles.txCredit : styles.txDebit]}>
+                  {isCredit ? '+' : '−'}{Math.abs(tx.amount)}
+                </Text>
+              </View>
+            );
+          })
+        )}
       </View>
 
       {/* TOP UP MODAL */}
@@ -358,6 +402,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
+  recentTxSection: {
+    marginTop: 8,
+    paddingTop: 8,
+  },
+  recentTxTitle: {
+    color: '#8E8E93',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 10,
+    letterSpacing: 0.5,
+  },
+  recentTxEmpty: {
+    color: '#666',
+    fontSize: 14,
+  },
+  recentTxRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1A1A1A',
+  },
+  recentTxLabel: {
+    color: '#FFF',
+    fontSize: 14,
+    flex: 1,
+    marginRight: 12,
+  },
+  recentTxAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  txCredit: { color: '#4CD964' },
+  txDebit: { color: '#FF6B6B' },
 
   modalBackdrop: {
     flex: 1,

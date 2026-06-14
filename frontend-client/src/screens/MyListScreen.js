@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -24,6 +25,7 @@ import {
   fetchBookmarks,
   fetchWatchHistory,
   toggleBookmark,
+  deleteWatchHistory,
   selectBookmarks,
   selectWatchHistory,
   selectBookmarksLoading,
@@ -86,7 +88,7 @@ const pStyles = StyleSheet.create({
 // Show card — matches the UI reference image exactly
 // thumbnail on left, title + category + EP.X / EP.TOTAL on right
 // ─────────────────────────────────────────────────────────────────
-function ShowCard({ item, onPress, onRemove, showRemove = false }) {
+function ShowCard({ item, onPress, onDelete }) {
   const progressPct =
     item.duration_sec > 0
       ? Math.min(Math.round((item.progress_sec / item.duration_sec) * 100), 100)
@@ -102,6 +104,16 @@ function ShowCard({ item, onPress, onRemove, showRemove = false }) {
       ]}
       onPress={onPress}
     >
+      {onDelete ? (
+        <TouchableOpacity
+          style={cardStyles.deleteBtn}
+          onPress={onDelete}
+          hitSlop={8}
+        >
+          <Ionicons name="trash-outline" size={16} color={theme.white} />
+        </TouchableOpacity>
+      ) : null}
+
       {/* Thumbnail */}
       <View style={cardStyles.thumbnailWrap}>
         {resolvedThumbnailUrl ? (
@@ -142,17 +154,6 @@ function ShowCard({ item, onPress, onRemove, showRemove = false }) {
         <Text style={cardStyles.epLine}>
           EP.{item.episode_num} {'/'} EP.{item.total_episodes || '?'}
         </Text>
-
-        {/* Remove button (trash) — only shown for bookmarks */}
-        {showRemove && onRemove ? (
-          <TouchableOpacity
-            style={cardStyles.removeBtn}
-            onPress={onRemove}
-            hitSlop={8}
-          >
-            <Ionicons name="trash-outline" size={16} color={theme.crimson} />
-          </TouchableOpacity>
-        ) : null}
       </View>
     </Pressable>
   );
@@ -166,6 +167,19 @@ const cardStyles = StyleSheet.create({
     overflow: 'hidden',
     height: 110,
     marginBottom: 14,
+    position: 'relative',
+  },
+  deleteBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   thumbnailWrap: {
     width: 140,
@@ -212,10 +226,6 @@ const cardStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     marginTop: 2,
-  },
-  removeBtn: {
-    marginTop: 6,
-    alignSelf: 'flex-start',
   },
 });
 
@@ -345,11 +355,42 @@ export default function MyListScreen() {
 
   // ── Remove bookmark ──────────────────────────────────────────
   const handleRemoveBookmark = useCallback((bookmark) => {
-    dispatch(toggleBookmark({
-      showId: bookmark.show_id,
-      episodeId: bookmark.episode_id,
-      progressSec: bookmark.progress_sec || 0,
-    }));
+    Alert.alert(
+      'Remove from Saved',
+      'Are you sure you want to remove this drama from your saved list?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            dispatch(toggleBookmark({
+              showId: bookmark.show_id,
+              episodeId: bookmark.episode_id,
+              progressSec: bookmark.progress_sec || 0,
+            }));
+          },
+        },
+      ]
+    );
+  }, [dispatch]);
+
+  const handleRemoveWatchHistory = useCallback((entry) => {
+    if (!entry.history_id) return;
+    Alert.alert(
+      'Remove from Continue Watching',
+      'Are you sure you want to delete this from your watch history?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            dispatch(deleteWatchHistory({ historyId: entry.history_id }));
+          },
+        },
+      ]
+    );
   }, [dispatch]);
 
   // ── Merge bookmark with latest watch history ──────────────────
@@ -465,8 +506,7 @@ export default function MyListScreen() {
                     progress_sec: displayEntry.progress_sec,
                     total_episodes: displayEntry.total_episodes || 1,
                   })}
-                  onRemove={() => handleRemoveBookmark(item)}
-                  showRemove
+                  onDelete={() => handleRemoveBookmark(item)}
                 />
               );
             }}
@@ -509,7 +549,7 @@ export default function MyListScreen() {
                   progress_sec: item.progress_sec,
                   total_episodes: item.total_episodes || 1,
                 })}
-                showRemove={false}
+                onDelete={() => handleRemoveWatchHistory(item)}
               />
             )}
           />

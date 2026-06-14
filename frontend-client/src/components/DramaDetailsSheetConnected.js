@@ -139,6 +139,7 @@ export default function DramaDetailsSheetConnected({
   onRangeChange,
   onEpisodePress,
   onRelatedPress,
+  onStartWatching,
 }) {
   // All hooks must be called unconditionally, before any returns
   const [tab, setTab] = useState(initialTab);
@@ -317,6 +318,17 @@ export default function DramaDetailsSheetConnected({
                     ))}
                   </View>
                 ) : null}
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.startWatchingBtn,
+                    pressed && styles.startWatchingBtnPressed,
+                  ]}
+                  onPress={() => onStartWatching && onStartWatching()}
+                >
+                  <Ionicons name="play" size={18} color={theme.white} />
+                  <Text style={styles.startWatchingText}>Start Watching</Text>
+                </Pressable>
               </View>
             ) : (
               <View>
@@ -501,6 +513,25 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     marginTop: 18,
+  },
+  startWatchingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 20,
+    backgroundColor: theme.crimson,
+    borderRadius: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+  },
+  startWatchingBtnPressed: {
+    opacity: 0.88,
+  },
+  startWatchingText: {
+    color: theme.white,
+    fontSize: 16,
+    fontWeight: '800',
   },
   tag: {
     paddingHorizontal: 10,

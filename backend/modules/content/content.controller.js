@@ -87,7 +87,8 @@ async function deleteEpisode(req, res, next) {
 // ── Home promotions (mobile) ──
 async function getHomeBanners(req, res, next) {
   try {
-    const banners = await service.getActiveHomeBanners(3);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 10);
+    const banners = await service.getActiveHomeBanners(limit);
     res.json({ banners });
   } catch (e) {
     next(e);

@@ -266,6 +266,15 @@ export default function ForYouScreen() {
     navigation.navigate(ROUTES.SHOW_PLAYER, { fromForYou: true });
   }, [dispatch, navigation, selectedDrama, showMode, accessToken, sheetInitialTab]);
 
+  const handleStartWatching = useCallback(() => {
+    if (!selectedDrama || !showMode) return;
+    const episode = showMode.episodes?.find((ep) => ep.status === 'ready' && !ep.is_locked)
+      || showMode.episodes?.[0];
+    if (episode) {
+      handleEpisodePress(episode);
+    }
+  }, [selectedDrama, showMode, handleEpisodePress]);
+
   const handleRefresh = useCallback(() => {
     dispatch(fetchForYouFeed({ offset: 0, refresh: true }));
   }, [dispatch]);
@@ -352,6 +361,7 @@ export default function ForYouScreen() {
         onClose={handleCloseSheet}
         onEpisodePress={handleEpisodePress}
         onRelatedPress={handleRelatedPress}
+        onStartWatching={handleStartWatching}
         streamBase={API_BASE_URL}
       />
     </View>

@@ -77,12 +77,8 @@ export default function OtpVerificationScreen({ navigation, route }) {
   useEffect(() => {
     if (otpState.status === 'succeeded') {
       dispatch(clearOtpState());
-      navigation.reset({
-        index: 0,
-        routes: [{ name: ROUTES.LOGIN }],
-      });
     }
-  }, [dispatch, navigation, otpState.status]);
+  }, [dispatch, otpState.status]);
 
   const otpExpiryLabel = useMemo(
     () => formatCountdown(otpExpiresAt, now),

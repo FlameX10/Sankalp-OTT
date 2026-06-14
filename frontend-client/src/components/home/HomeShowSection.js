@@ -1,0 +1,203 @@
+import React from 'react';
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+import { theme } from '../../constants/theme';
+import { API_BASE_URL } from '../../constants/config';
+
+const CARD_WIDTH = 108;
+
+function resolveThumbnailUrl(url) {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  return `${API_BASE_URL}${url}`;
+}
+
+function SectionCard({ item, onPress, compact }) {
+  const uri = resolveThumbnailUrl(item.thumbnail_url);
+  return (
+    <TouchableOpacity
+      style={[styles.card, compact && styles.cardCompact]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      <View style={styles.posterWrap}>
+        {uri ? (
+          <Image source={{ uri }} style={styles.poster} resizeMode="cover" />
+        ) : (
+          <View style={[styles.poster, styles.posterFallback]} />
+        )}
+        <View style={styles.viewBadge}>
+          <Ionicons name="eye-outline" size={10} color="#fff" />
+          <Text style={styles.viewText}>
+            {formatViews(item.view_count)}
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.cardTitle} numberOfLines={2}>
+        {item.title}
+      </Text>
+      {item.tags?.length > 0 ? (
+        <Text style={styles.cardTags} numberOfLines={1}>
+          {item.tags.join(' · ')}
+        </Text>
+      ) : (
+        <Text style={styles.cardCategory} numberOfLines={1}>
+          {item.category_name || item.category || ''}
+        </Text>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+function formatViews(viewCount) {
+  if (typeof viewCount !== 'number' || Number.isNaN(viewCount)) return '0';
+  if (viewCount >= 1_000_000) return `${(viewCount / 1_000_000).toFixed(1)}M`;
+  if (viewCount >= 1_000) return `${(viewCount / 1_000).toFixed(1)}K`;
+  return String(viewCount);
+}
+
+export default function HomeShowSection({
+  title,
+  items = [],
+  onItemPress,
+  onExpand,
+  renderItem,
+  emptyText,
+}) {
+  if (!items.length && !emptyText) return null;
+
+  return (
+    <View style={styles.section}>
+      <View style={styles.header}>
+        <Text style={styles.title}>{title}</Text>
+        {onExpand && items.length > 0 ? (
+          <Pressable style={styles.expandBtn} onPress={onExpand} hitSlop={8}>
+            <Ionicons name="chevron-forward" size={22} color={theme.gray} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      {items.length === 0 ? (
+        <Text style={styles.empty}>{emptyText}</Text>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {items.map((item) => (
+            renderItem ? (
+              <View key={item.id || item.show_id || item.history_id} style={styles.cardSlot}>
+                {renderItem(item)}
+              </View>
+            ) : (
+              <SectionCard
+                key={item.id || item.show_id}
+                item={item}
+                onPress={() => onItemPress?.(item)}
+              />
+            )
+          ))}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  section: {
+    marginBottom: 22,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  title: {
+    color: theme.white,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  expandBtn: {
+    padding: 4,
+  },
+  scrollContent: {
+    paddingHorizontal: 4,
+    gap: 10,
+  },
+  cardSlot: {
+    marginRight: 0,
+  },
+  card: {
+    width: CARD_WIDTH,
+  },
+  cardCompact: {
+    width: 140,
+  },
+  posterWrap: {
+    width: '100%',
+    aspectRatio: 0.7,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#1A1A1A',
+    position: 'relative',
+  },
+  poster: {
+    width: '100%',
+    height: '100%',
+  },
+  posterFallback: {
+    backgroundColor: theme.surface,
+  },
+  viewBadge: {
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  viewText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  cardTitle: {
+    color: theme.white,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 6,
+    lineHeight: 16,
+  },
+  cardTags: {
+    color: theme.white,
+    fontSize: 10,
+    fontWeight: '800',
+    marginTop: 3,
+  },
+  cardCategory: {
+    color: theme.gray,
+    fontSize: 10,
+    marginTop: 3,
+  },
+  empty: {
+    color: theme.gray,
+    fontSize: 13,
+    paddingHorizontal: 4,
+  },
+});

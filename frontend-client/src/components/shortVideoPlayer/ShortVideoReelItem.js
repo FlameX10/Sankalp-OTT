@@ -13,7 +13,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
@@ -191,6 +191,38 @@ export default function ShortVideoReelItem({
       onFirstFrameReady();
     }
   }, [originalOnReadyForDisplay, onFirstFrameReady, item.episode_num]);
+
+  const handleSkipBack = useCallback(() => {
+    seekTo(Math.max(0, (currentTime || 0) - 10));
+  }, [seekTo, currentTime]);
+
+  const handleSkipForward = useCallback(() => {
+    const max = duration || item.duration_sec || 0;
+    seekTo(Math.min(max, (currentTime || 0) + 10));
+  }, [seekTo, currentTime, duration, item.duration_sec]);
+
+  const renderSeekControls = () => (
+    <View style={styles.ottSeekRow}>
+      <Pressable style={styles.ottSeekBtn} onPress={handleSkipBack} hitSlop={12}>
+        <MaterialCommunityIcons name="rewind-10" size={42} color="#fff" />
+      </Pressable>
+      <Pressable
+        style={styles.ottPlayPauseFab}
+        onPress={handlePlayPausePress}
+        hitSlop={16}
+      >
+        <Ionicons
+          name={manuallyPaused ? 'play' : 'pause'}
+          size={44}
+          color="#fff"
+          style={manuallyPaused ? styles.playIconNudge : undefined}
+        />
+      </Pressable>
+      <Pressable style={styles.ottSeekBtn} onPress={handleSkipForward} hitSlop={12}>
+        <MaterialCommunityIcons name="fast-forward-10" size={42} color="#fff" />
+      </Pressable>
+    </View>
+  );
 
   // Bookmark press handler — passes full item data for optimistic local update in Redux
   const handleBookmarkPress = useCallback(() => {
@@ -438,18 +470,7 @@ export default function ShortVideoReelItem({
             style={[styles.ottCenterWrap, { opacity: controlsOpacity }]}
             pointerEvents={showMainOverlay ? 'box-none' : 'none'}
           >
-            <Pressable
-              style={styles.ottPlayPauseFab}
-              onPress={handlePlayPausePress}
-              hitSlop={16}
-            >
-              <Ionicons
-                name={manuallyPaused ? 'play' : 'pause'}
-                size={44}
-                color="#fff"
-                style={manuallyPaused ? styles.playIconNudge : undefined}
-              />
-            </Pressable>
+            {renderSeekControls()}
           </Animated.View>
         </View>
       ) : null}
@@ -523,18 +544,7 @@ export default function ShortVideoReelItem({
 
           {(controlsVisible || manuallyPaused) ? (
             <View style={styles.ottCenterWrap} pointerEvents="box-none">
-              <Pressable
-                style={styles.ottPlayPauseFab}
-                onPress={handlePlayPausePress}
-                hitSlop={16}
-              >
-                <Ionicons
-                  name={manuallyPaused ? 'play' : 'pause'}
-                  size={44}
-                  color="#fff"
-                  style={manuallyPaused ? styles.playIconNudge : undefined}
-                />
-              </Pressable>
+              {renderSeekControls()}
             </View>
           ) : null}
         </View>
@@ -673,8 +683,7 @@ export default function ShortVideoReelItem({
 
             {item.synopsis ? (
               <Text style={styles.descText} numberOfLines={2}>
-                {item.synopsis}{' '}
-                <Text style={{ fontWeight: 'bold', color: '#fff' }}>more</Text>
+                {item.synopsis}
               </Text>
             ) : null}
 

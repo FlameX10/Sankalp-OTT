@@ -1,0 +1,148 @@
+import React, { useRef, useState } from 'react';
+import {
+  Dimensions,
+  FlatList,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+import { theme } from '../../constants/theme';
+import { API_BASE_URL } from '../../constants/config';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const HERO_HEIGHT = Math.round(SCREEN_WIDTH * 0.52);
+const HERO_WIDTH = SCREEN_WIDTH - 32;
+
+function resolveImageUrl(url) {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  return `${API_BASE_URL}${url}`;
+}
+
+export default function HomeHeroSlider({ banners = [], onBannerPress }) {
+  const listRef = useRef(null);
+  const [index, setIndex] = useState(0);
+
+  if (!banners.length) return null;
+
+  const onScrollEnd = (e) => {
+    const i = Math.round(e.nativeEvent.contentOffset.x / HERO_WIDTH);
+    setIndex(i);
+  };
+
+  return (
+    <View style={styles.wrap}>
+      <FlatList
+        ref={listRef}
+        data={banners}
+        keyExtractor={(item) => item.id}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={HERO_WIDTH}
+        decelerationRate="fast"
+        onMomentumScrollEnd={onScrollEnd}
+        renderItem={({ item }) => {
+          const uri = resolveImageUrl(item.image_url || item.show_thumbnail_url);
+          return (
+            <Pressable
+              style={[styles.slide, { width: HERO_WIDTH }]}
+              onPress={() => onBannerPress?.(item)}
+            >
+              {uri ? (
+                <Image source={{ uri }} style={styles.image} resizeMode="cover" />
+              ) : (
+                <View style={[styles.image, styles.imageFallback]} />
+              )}
+              <View style={styles.overlay} />
+              <View style={styles.caption}>
+                <Text style={styles.title} numberOfLines={2}>
+                  {item.show_title || item.title}
+                </Text>
+                <View style={styles.watchRow}>
+                  <Ionicons name="play-circle" size={18} color={theme.crimson} />
+                  <Text style={styles.watchText}>Watch now</Text>
+                </View>
+              </View>
+            </Pressable>
+          );
+        }}
+      />
+      {banners.length > 1 ? (
+        <View style={styles.dots}>
+          {banners.map((b, i) => (
+            <View
+              key={b.id}
+              style={[styles.dot, i === index && styles.dotActive]}
+            />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: {
+    marginBottom: 20,
+  },
+  slide: {
+    height: HERO_HEIGHT,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#1A1A1A',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  imageFallback: {
+    backgroundColor: theme.surface,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  caption: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    bottom: 14,
+  },
+  title: {
+    color: theme.white,
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  watchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  watchText: {
+    color: theme.white,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  dots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  dotActive: {
+    backgroundColor: theme.crimson,
+    width: 18,
+  },
+});

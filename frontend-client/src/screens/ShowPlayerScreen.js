@@ -64,6 +64,7 @@ export default function ShowPlayerScreen({ navigation }) {
   const isFocused = useIsFocused();
   const fromForYou = !!route.params?.fromForYou;
   const fromHome = !!route.params?.fromHome;
+  const fromMyList = !!route.params?.fromMyList;
   const fromDeepLink = !!route.params?.fromDeepLink; // NEW — arrived via shared link
   const dramaSheetSource = fromForYou ? 'forYou' : fromHome ? 'home' : null;
   const insets = useSafeAreaInsets();
@@ -114,6 +115,17 @@ export default function ShowPlayerScreen({ navigation }) {
     recordWatchHistory(ep, startProgressSec || 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Ensure episode streams are loaded (My List seeds hls_url: null until fetch completes)
+  useEffect(() => {
+    if (!showId || loading) return;
+    const needsFetch = episodes.length === 0 || episodes.some((ep) => !ep.hls_url);
+    if (!needsFetch) return;
+
+    const targetEp = episodes[startIndex]?.episode_num || episodes[0]?.episode_num || 1;
+    const fromEp = Math.max(1, Math.floor((targetEp - 1) / PLAYER_PAGE_SIZE) * PLAYER_PAGE_SIZE + 1);
+    dispatch(fetchShowPlayerPage({ showId, fromEp, limit: PLAYER_PAGE_SIZE }));
+  }, [showId, episodes, loading, startIndex, dispatch]);
 
   // Scroll to starting episode
   useEffect(() => {

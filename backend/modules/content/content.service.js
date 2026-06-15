@@ -642,6 +642,50 @@ async function getActiveHomeBanners(limit = 3) {
 }
 
 /**
+ * Active hero slider banners ordered by display_order (1st, 2nd, …).
+ */
+async function getActiveHeroBanners(limit = 10) {
+  const now = new Date();
+  const banners = await prisma.heroBanner.findMany({
+    where: {
+      is_active: true,
+      show_id: { not: null },
+      AND: [
+        { OR: [{ starts_at: null }, { starts_at: { lte: now } }] },
+        { OR: [{ ends_at: null }, { ends_at: { gte: now } }] },
+      ],
+    },
+    orderBy: [{ display_order: 'asc' }, { created_at: 'asc' }],
+    take: limit,
+    include: {
+      show: {
+        select: {
+          id: true,
+          title: true,
+          thumbnail_url: true,
+          banner_url: true,
+          synopsis: true,
+          is_active: true,
+        },
+      },
+    },
+  });
+
+  return banners
+    .filter((b) => b.show?.is_active !== false)
+    .map((b) => ({
+      id: b.id,
+      title: b.title,
+      image_url: b.image_url,
+      display_order: b.display_order,
+      show_id: b.show_id,
+      show_title: b.show?.title || b.title,
+      show_thumbnail_url: b.show?.thumbnail_url || null,
+      show_synopsis: b.show?.synopsis || null,
+    }));
+}
+
+/**
  * Up to 3 most recent admin broadcast notifications (deduped by title+body+type).
  */
 async function getLatestAnnouncements(limit = 3) {
@@ -682,5 +726,5 @@ export {
   getAllTags, createTag, updateTag, deleteTag,
   getAllShows, getShowById, getRelatedShows, createShow, updateShow, deleteShow, toggleShowPublish, updateFeedPosition,
   getEpisodesByShow, createEpisode, updateEpisode, deleteEpisode,
-  getActiveHomeBanners, getLatestAnnouncements,
+  getActiveHomeBanners, getActiveHeroBanners, getLatestAnnouncements,
 };

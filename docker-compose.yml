@@ -239,10 +239,15 @@ services:
     build: ./backend
     container_name: ott-prisma-studio
 
-    command: npx prisma studio --port 5555 --browser none --hostname 0.0.0.0
+    command: >
+      sh -c "npx prisma generate && npx prisma studio --port 5555 --browser none --hostname 0.0.0.0"
 
     ports:
       - "5555:5555"
+
+    volumes:
+      # Keep Prisma Studio in sync with local schema without rebuilding the image
+      - ./backend/prisma:/app/prisma
 
     environment:
       - DATABASE_URL=postgresql://ottdev:ottdev123@postgres:5432/ott_dev

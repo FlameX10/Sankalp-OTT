@@ -235,6 +235,7 @@ model Show {
   episodes         Episode[]
   show_tags        ShowTag[]
   banners          Banner[]
+  hero_banners     HeroBanner[]
   bookmarks        Bookmark[]
   playlist_items   PlaylistItem[]
   collection_shows CollectionShow[]
@@ -394,6 +395,24 @@ model Banner {
 
   @@index([is_active, starts_at, ends_at], name: "idx_banners_active")
   @@map("banners")
+}
+
+model HeroBanner {
+  id            String    @id @default(uuid()) @db.Uuid
+  show_id       String?   @db.Uuid
+  image_url     String    @db.VarChar(500)
+  title         String?   @db.VarChar(255)
+  display_order Int       @default(0)
+  is_active     Boolean   @default(true)
+  starts_at     DateTime?
+  ends_at       DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  show Show? @relation(fields: [show_id], references: [id])
+
+  @@index([is_active, display_order], name: "idx_hero_banners_active_order")
+  @@map("hero_banners")
 }
 
 model Collection {

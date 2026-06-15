@@ -24,13 +24,13 @@ import CoinIcon from '../components/CoinIcon';
 import DramaDetailsSheetConnected from '../components/DramaDetailsSheetConnected';
 import HomeHeroSlider from '../components/home/HomeHeroSlider';
 import HomeShowSection from '../components/home/HomeShowSection';
-import { fetchHomeBanners } from '../components/home/homePromoApi';
+import { fetchHeroBanners } from '../components/home/homePromoApi';
 import { ROUTES } from '../constants/routes';
 import { theme } from '../constants/theme';
 import { clearPendingHomeBanner } from '../redux/slices/promoFlowSlice';
 import { API_BASE_URL } from '../constants/config';
 import { createAuthenticatedApi } from '../services/api';
-import { initShowPlayer } from '../redux/slices/showPlayerSlice';
+import { initShowPlayer, fetchShowPlayerPage } from '../redux/slices/showPlayerSlice';
 import {
   fetchBookmarks,
   fetchWatchHistory,
@@ -129,6 +129,7 @@ export default function PopularScreen() {
   const watchHistory = useSelector(selectWatchHistory);
   const [heroBanners, setHeroBanners] = useState([]);
   const [expandedSection, setExpandedSection] = useState(null);
+  const [expandedCategoryTab, setExpandedCategoryTab] = useState(null);
 
   const goToEarnRewards = () => {
     navigation.navigate(ROUTES.PROFILE, {
@@ -202,12 +203,15 @@ export default function PopularScreen() {
 
   const expandedItems = useMemo(() => {
     if (!expandedSection) return [];
-    if (expandedSection === 'all') return shows;
+    if (expandedSection === 'all') {
+      if (!expandedCategoryTab) return shows;
+      return shows.filter((s) => s.category_id === expandedCategoryTab);
+    }
     if (expandedSection === 'trending') return trendingShows;
     if (expandedSection === 'continue') return watchHistory;
     if (expandedSection === 'saved') return bookmarks;
     return [];
-  }, [expandedSection, shows, trendingShows, watchHistory, bookmarks]);
+  }, [expandedSection, shows, trendingShows, watchHistory, bookmarks, expandedCategoryTab]);
 
   useEffect(() => {
     filterPanelOpenRef.current = filterPanelOpen;
@@ -293,7 +297,7 @@ export default function PopularScreen() {
   useFocusEffect(
     useCallback(() => {
       loadShows();
-      fetchHomeBanners(5)
+      fetchHeroBanners(10)
         .then(setHeroBanners)
         .catch(() => setHeroBanners([]));
       if (accessToken) {
@@ -486,8 +490,13 @@ export default function PopularScreen() {
         seedEpisodes: [{
           episode_id: entry.episode_id,
           episode_num: entry.episode_num,
+          hls_url: null,
           duration_sec: entry.duration_sec || 0,
+          title: null,
           is_locked: false,
+          lock_reason: null,
+          is_free: true,
+          coin_cost: 0,
           status: 'ready',
         }],
         startEpisodeNum: entry.episode_num,
@@ -495,8 +504,20 @@ export default function PopularScreen() {
         startProgressSec: entry.progress_sec || 0,
       })
     );
+    dispatch(
+      fetchShowPlayerPage({
+        showId: entry.show_id,
+        fromEp: Math.max(1, Math.floor((entry.episode_num - 1) / 30) * 30 + 1),
+        limit: 30,
+      })
+    );
     navigation.navigate(ROUTES.SHOW_PLAYER, { fromHome: true });
   }, [dispatch, navigation]);
+
+  const openExpandedAll = useCallback(() => {
+    setExpandedCategoryTab(null);
+    setExpandedSection('all');
+  }, []);
 
   const handleCloseSheet = () => {
     if (sheetHistory.length > 0) {
@@ -689,7 +710,7 @@ export default function PopularScreen() {
             title="All"
             items={allShowsPreview}
             onItemPress={(item) => openDetails(item)}
-            onExpand={() => setExpandedSection('all')}
+            onExpand={openExpandedAll}
           />
 
           <HomeShowSection
@@ -736,7 +757,10 @@ export default function PopularScreen() {
       <Modal
         visible={Boolean(expandedSection)}
         animationType="slide"
-        onRequestClose={() => setExpandedSection(null)}
+        onRequestClose={() => {
+          setExpandedSection(null);
+          setExpandedCategoryTab(null);
+        }}
       >
         <View style={[styles.expandModal, { paddingTop: insets.top }]}>
           <View style={styles.expandHeader}>
@@ -746,10 +770,43 @@ export default function PopularScreen() {
               {expandedSection === 'continue' && 'Continue Watching'}
               {expandedSection === 'saved' && 'Saved'}
             </Text>
-            <TouchableOpacity onPress={() => setExpandedSection(null)} hitSlop={10}>
+            <TouchableOpacity
+              onPress={() => {
+                setExpandedSection(null);
+                setExpandedCategoryTab(null);
+              }}
+              hitSlop={10}
+            >
               <Ionicons name="close" size={26} color="#fff" />
             </TouchableOpacity>
           </View>
+
+          {expandedSection === 'all' && tabs.length > 0 ? (
+            <View style={styles.expandTabContainer}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.tabScrollContent}
+              >
+                {tabs.map((tab) => (
+                  <TouchableOpacity
+                    key={tab.id ?? 'all'}
+                    onPress={() => setExpandedCategoryTab(tab.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.tabText,
+                        expandedCategoryTab === tab.id && styles.activeTabText,
+                      ]}
+                    >
+                      {tab.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
+
           <FlatList
             data={expandedItems}
             keyExtractor={(item, index) => String(item.id || item.show_id || item.history_id || item.bookmark_id || index)}
@@ -985,6 +1042,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   expandTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  expandTabContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
   loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyText: { color: '#666', textAlign: 'center', marginTop: 50, fontSize: 16 },
   

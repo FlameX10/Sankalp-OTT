@@ -15,6 +15,7 @@ import Users         from './pages/Users.jsx'
 import Dramas        from './pages/Dramas.jsx'
 import Categories    from './pages/Categories.jsx'
 import Banners       from './pages/Banners.jsx'
+import HeroBanners   from './pages/HeroBanners.jsx'
 import Membership    from './pages/Membership.jsx'
 import TopUp         from './pages/TopUp.jsx'
 import Coins         from './pages/Coins.jsx'
@@ -29,6 +30,7 @@ const ROUTES = {
   dramas:        Dramas,
   categories:    Categories,
   banners:       Banners,
+  hero_banners:  HeroBanners,
   membership:    Membership,
   topup:         TopUp,
   coins:         Coins,

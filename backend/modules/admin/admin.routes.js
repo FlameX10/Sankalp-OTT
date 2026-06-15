@@ -15,6 +15,12 @@ import {
   updateBanner,
   deleteBanner,
   toggleBanner,
+  getHeroBanners,
+  createHeroBanner,
+  updateHeroBanner,
+  deleteHeroBanner,
+  toggleHeroBanner,
+  reorderHeroBanners,
   getDashboardMetrics,
   getRevenueChart,
   getTopShowsChart,
@@ -69,6 +75,14 @@ router.post('/banners', requireAuth, requireAdmin('banners'), createBanner);
 router.put('/banners/:id', requireAuth, requireAdmin('banners'), updateBanner);
 router.patch('/banners/:id/toggle', requireAuth, requireAdmin('banners'), toggleBanner);
 router.delete('/banners/:id', requireAuth, requireAdmin('banners'), deleteBanner);
+
+// ── Hero banners (home slider) ──
+router.get('/hero-banners', requireAuth, requireAdmin('hero_banners'), getHeroBanners);
+router.post('/hero-banners', requireAuth, requireAdmin('hero_banners'), createHeroBanner);
+router.put('/hero-banners/reorder', requireAuth, requireAdmin('hero_banners'), reorderHeroBanners);
+router.put('/hero-banners/:id', requireAuth, requireAdmin('hero_banners'), updateHeroBanner);
+router.patch('/hero-banners/:id/toggle', requireAuth, requireAdmin('hero_banners'), toggleHeroBanner);
+router.delete('/hero-banners/:id', requireAuth, requireAdmin('hero_banners'), deleteHeroBanner);
 
 // ── View count (dramas section) --
 router.post('/shows/:showId/view-count-adjust', requireAuth, requireAdmin('dramas'), adjustShowViewCount);

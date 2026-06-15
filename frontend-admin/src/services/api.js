@@ -318,3 +318,13 @@ export const bannersApi = {
   delete: (id) => api.delete(`/v1/admin/banners/${id}`),
   toggle: (id) => api.patch(`/v1/admin/banners/${id}/toggle`),
 };
+
+// ── Hero Section Banners ──
+export const heroBannersApi = {
+  getAll: () => api.get('/v1/admin/hero-banners'),
+  create: (data) => api.post('/v1/admin/hero-banners', data),
+  update: (id, data) => api.put(`/v1/admin/hero-banners/${id}`, data),
+  delete: (id) => api.delete(`/v1/admin/hero-banners/${id}`),
+  toggle: (id) => api.patch(`/v1/admin/hero-banners/${id}/toggle`),
+  reorder: (orderedIds) => api.put('/v1/admin/hero-banners/reorder', { ordered_ids: orderedIds }),
+};

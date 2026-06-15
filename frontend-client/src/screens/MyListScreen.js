@@ -345,12 +345,12 @@ export default function MyListScreen() {
     dispatch(
       fetchShowPlayerPage({
         showId: entry.show_id,
-        fromEp: 1,
+        fromEp: Math.max(1, Math.floor((entry.episode_num - 1) / 30) * 30 + 1),
         limit: 30,
       })
     );
 
-    navigation.navigate(ROUTES.SHOW_PLAYER);
+    navigation.navigate(ROUTES.SHOW_PLAYER, { fromMyList: true });
   }, [dispatch, navigation]);
 
   // ── Remove bookmark ──────────────────────────────────────────

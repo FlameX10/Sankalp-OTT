@@ -60,6 +60,12 @@
         }
       ],
       [
+        "react-native-capture-protection",
+        {
+          "captureType": "base"
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {

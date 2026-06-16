@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { Provider } from 'react-redux';
+import { CaptureProtectionProvider } from 'react-native-capture-protection';
 
 import RootStackNavigator from './src/navigation/RootStackNavigator';
 import { PlaybackSpeedProvider } from './src/context/PlaybackSpeedContext';
@@ -27,16 +28,18 @@ setShowPlayerStore(store);
 
 export default function App() {
   return (
-    <Provider store={store}>
-      <PlaybackSpeedProvider>
-        <PlaybackVolumeProvider>
-          <VideoQualityProvider>
-            {/* "light" keeps status bar text/icons white on the dark app background */}
-            <StatusBar style="light" />
-            <RootStackNavigator />
-          </VideoQualityProvider>
-        </PlaybackVolumeProvider>
-      </PlaybackSpeedProvider>
-    </Provider>
+    <CaptureProtectionProvider>
+      <Provider store={store}>
+        <PlaybackSpeedProvider>
+          <PlaybackVolumeProvider>
+            <VideoQualityProvider>
+              {/* "light" keeps status bar text/icons white on the dark app background */}
+              <StatusBar style="light" />
+              <RootStackNavigator />
+            </VideoQualityProvider>
+          </PlaybackVolumeProvider>
+        </PlaybackSpeedProvider>
+      </Provider>
+    </CaptureProtectionProvider>
   );
 }

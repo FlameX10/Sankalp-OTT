@@ -4,6 +4,7 @@ import {
   Animated,
   Image,
   Modal,
+  Platform,
   Pressable,
   Share,
   StatusBar,
@@ -18,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import Video from 'react-native-video';
+import { CaptureProtection, useCaptureProtection } from 'react-native-capture-protection';
 
 import ProgressBar from './ProgressBar';
 import SideAction from './SideAction';
@@ -77,6 +79,8 @@ export default function ShortVideoReelItem({
   const navigation = useNavigation();
   const dispatch = useDispatch();
 
+  const { status } = useCaptureProtection();
+
   const accessToken = useSelector((state) => state.auth?.accessToken);
   const isBookmarked = useSelector(selectIsBookmarked(item.show_id));
   const bookmarksLoaded = useSelector(selectBookmarksLoaded);
@@ -122,6 +126,19 @@ export default function ShortVideoReelItem({
   const isLocked = item.is_locked;
   const streamUrl = !isLocked && item.hls_url ? `${streamBase}${item.hls_url}` : null;
   
+  useEffect(() => {
+    CaptureProtection.prevent({
+      screenshot: true,
+      record: true,
+      appSwitcher: true,
+    });
+    return () => {
+      CaptureProtection.allow();
+    };
+  }, []);
+
+  const isBeingRecorded = Platform.OS === 'ios' && status?.record === true;
+
   // Log streamUrl setup for debugging
   useEffect(() => {
     //console.log(`📺 ShortVideoReelItem mounted - Episode: ${item.episode_num}, Locked: ${isLocked}, URL: ${streamUrl?.substring(0, 80)}...`);
@@ -160,6 +177,14 @@ export default function ShortVideoReelItem({
   const showActiveBuffering = isActive && shouldRenderVideo && !firstFrameReady;
   const showMainOverlay = showOttOverlayControls || controlsVisible || manuallyPaused;
   const effectiveMuted = muted || volume <= 0;
+
+  useEffect(() => {
+    if (isBeingRecorded) {
+      if (!paused && !manuallyPaused) {
+        setManualPaused(true);
+      }
+    }
+  }, [isBeingRecorded, paused, manuallyPaused, setManualPaused]);
 
   useEffect(() => {
     if (shouldRenderVideo) return;
@@ -757,6 +782,16 @@ export default function ShortVideoReelItem({
             ) : null}
           </View>
       </Animated.View>
+
+      {/* iOS screen recording overlay */}
+      {isBeingRecorded ? (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }]} pointerEvents="auto">
+          <Ionicons name="videocam-off" size={64} color="#fff" />
+          <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', marginTop: 16 }}>
+            Screen recording is not allowed
+          </Text>
+        </View>
+      ) : null}
 
       {topOverlay}
     </View>

@@ -67,8 +67,10 @@ export default function ShowPlayerScreen({ navigation }) {
   const fromMyList = !!route.params?.fromMyList;
   const fromDeepLink = !!route.params?.fromDeepLink; // NEW — arrived via shared link
   const dramaSheetSource = fromForYou ? 'forYou' : fromHome ? 'home' : null;
+  const detailsSheetSource = dramaSheetSource || (fromMyList ? 'home' : null);
   const insets = useSafeAreaInsets();
   const flatListRef = useRef(null);
+  const pendingAutoAdvanceIndexRef = useRef(null);
 
   const [itemHeight, setItemHeight] = useState(SCREEN_HEIGHT);
   const onScreenLayout = useCallback((e) => {
@@ -182,6 +184,54 @@ export default function ShowPlayerScreen({ navigation }) {
     }, 200);
   }, [episodes.length]);
 
+  const scrollToEpisodeIndex = useCallback((nextIndex, animated = true) => {
+    if (!episodes[nextIndex]) return;
+    setCurrentIndex(nextIndex);
+    flatListRef.current?.scrollToIndex({
+      index: nextIndex,
+      animated,
+    });
+  }, [episodes]);
+
+  const handlePlaybackEnd = useCallback((endedIndex) => {
+    const nextIndex = endedIndex + 1;
+    if (episodes[nextIndex]) {
+      scrollToEpisodeIndex(nextIndex);
+      return;
+    }
+
+    if (hasMore && showId) {
+      pendingAutoAdvanceIndexRef.current = nextIndex;
+      if (!loading) {
+        dispatch(fetchShowPlayerPage({
+          showId,
+          fromEp: loadedUpTo + 1,
+          limit: PLAYER_PAGE_SIZE,
+        }));
+      }
+    }
+  }, [
+    dispatch,
+    episodes,
+    hasMore,
+    loadedUpTo,
+    loading,
+    scrollToEpisodeIndex,
+    showId,
+  ]);
+
+  useEffect(() => {
+    const pendingIndex = pendingAutoAdvanceIndexRef.current;
+    if (pendingIndex == null) return;
+
+    if (episodes[pendingIndex]) {
+      pendingAutoAdvanceIndexRef.current = null;
+      scrollToEpisodeIndex(pendingIndex);
+    } else if (!hasMore && !loading) {
+      pendingAutoAdvanceIndexRef.current = null;
+    }
+  }, [episodes, hasMore, loading, scrollToEpisodeIndex]);
+
   const handleClose = useCallback(() => {
     dispatch(clearShowPlayer());
     if (fromDeepLink) {
@@ -213,7 +263,7 @@ export default function ShowPlayerScreen({ navigation }) {
         startProgressSec: currentProgressSecRef.current || 0,
       };
 
-      if (dramaSheetSource === 'forYou') {
+      if (detailsSheetSource === 'forYou') {
         dispatch(
           setForYouDramaSheetSession({
             item: reelItem,
@@ -222,7 +272,7 @@ export default function ShowPlayerScreen({ navigation }) {
             playerSnapshot,
           })
         );
-      } else if (dramaSheetSource === 'home') {
+      } else if (detailsSheetSource === 'home') {
         dispatch(
           setHomeDramaSheetSession({
             selectedItem: reelItemToHomeSelected(reelItem),
@@ -232,9 +282,18 @@ export default function ShowPlayerScreen({ navigation }) {
           })
         );
       }
+
+      if (fromMyList) {
+        dispatch(setHomeReopenSheetAfterPlayer(true));
+        navigation.navigate(ROUTES.MAIN_TABS, {
+          screen: ROUTES.HOME,
+        });
+        return;
+      }
+
       navigation.goBack();
     },
-    [dispatch, navigation, dramaSheetSource, episodes, currentIndex, showId]
+    [detailsSheetSource, dispatch, episodes, currentIndex, fromMyList, navigation, showId]
   );
 
   useEffect(() => {
@@ -283,12 +342,13 @@ export default function ShowPlayerScreen({ navigation }) {
             streamBase=""
             itemHeight={itemHeight}
             renderTopOverlay={() => null}
-            onReturnToDramaSheet={dramaSheetSource ? returnToDramaSheet : undefined}
+            onReturnToDramaSheet={detailsSheetSource ? returnToDramaSheet : undefined}
             walletReturnParams={
               fromHome ? { fromHome: true } : fromForYou ? { fromForYou: true } : null
             }
             showEpisodeStrip={dramaSheetSource === 'forYou'}
             repeatPlayback={false}
+            onPlaybackEnd={() => handlePlaybackEnd(index)}
             // Seek to saved progress on first render of the starting episode
             initialSeekSec={
               index === startIndex && !hasSeenRef.current

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -59,6 +59,8 @@ export default function ForYouScreen() {
   const reopenAfterPlayer = useSelector(selectForYouReopenSheetAfterPlayer);
   const isFocused = useIsFocused();
   const accessToken = useSelector((state) => state.auth?.accessToken);
+  const flatListRef = useRef(null);
+  const pendingAutoAdvanceIndexRef = useRef(null);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -115,11 +117,46 @@ export default function ForYouScreen() {
     }
   }, [dispatch, hasMore, items.length, offset, viewportHeight]);
 
+  const scrollToFeedIndex = useCallback((nextIndex, animated = true) => {
+    if (!items[nextIndex]) return;
+    setCurrentIndex(nextIndex);
+    flatListRef.current?.scrollToIndex({
+      index: nextIndex,
+      animated,
+    });
+  }, [items]);
+
+  const handlePlaybackEnd = useCallback((endedIndex) => {
+    const nextIndex = endedIndex + 1;
+    if (items[nextIndex]) {
+      scrollToFeedIndex(nextIndex);
+      return;
+    }
+
+    if (hasMore) {
+      pendingAutoAdvanceIndexRef.current = nextIndex;
+      if (!loading) {
+        dispatch(fetchForYouFeed({ offset }));
+      }
+    }
+  }, [dispatch, hasMore, items, loading, offset, scrollToFeedIndex]);
+
+  useEffect(() => {
+    const pendingIndex = pendingAutoAdvanceIndexRef.current;
+    if (pendingIndex == null) return;
+
+    if (items[pendingIndex]) {
+      pendingAutoAdvanceIndexRef.current = null;
+      scrollToFeedIndex(pendingIndex);
+    } else if (!hasMore && !loading) {
+      pendingAutoAdvanceIndexRef.current = null;
+    }
+  }, [hasMore, items, loading, scrollToFeedIndex]);
+
   const openDramaDetails = useCallback((item, initialTab = 'synopsis', options = {}) => {
     if (options.fromRelated && selectedDrama) {
       setSheetHistory((history) => [
-        ...history,
-        { item: selectedDrama, initialTab: sheetInitialTab },
+        history[0] || { item: selectedDrama, initialTab: sheetInitialTab },
       ]);
     } else {
       setSheetHistory([]);
@@ -183,8 +220,8 @@ export default function ForYouScreen() {
 
   const handleCloseSheet = useCallback(() => {
     if (sheetHistory.length > 0) {
-      const previous = sheetHistory[sheetHistory.length - 1];
-      setSheetHistory((history) => history.slice(0, -1));
+      const previous = sheetHistory[0];
+      setSheetHistory([]);
       setDramaSheetKey((k) => k + 1);
       setSelectedDrama(previous.item);
       setSheetInitialTab(previous.initialTab || 'synopsis');
@@ -307,6 +344,7 @@ export default function ForYouScreen() {
     <View style={styles.screen} onLayout={onScreenLayout}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <FlatList
+        ref={flatListRef}
         data={items}
         keyExtractor={(item) => item.episode_id}
         renderItem={({ item, index }) => (
@@ -326,6 +364,7 @@ export default function ForYouScreen() {
             showPlaybackSpeedControl
             showOttOverlayControls
             showViewsAction
+            onPlaybackEnd={() => handlePlaybackEnd(index)}
           />
         )}
         pagingEnabled

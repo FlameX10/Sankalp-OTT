@@ -70,6 +70,9 @@ export default function HomeShowSection({
   items = [],
   onItemPress,
   onExpand,
+  categoryTabs = [],
+  activeCategoryId,
+  onCategoryPress,
   renderItem,
   emptyText,
 }) {
@@ -78,7 +81,30 @@ export default function HomeShowSection({
   return (
     <View style={styles.section}>
       <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
+        {categoryTabs.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryTabContent}
+          >
+            {categoryTabs.map((tab) => {
+              const isActive = String(tab.id ?? 'all') === String(activeCategoryId ?? 'all');
+              return (
+                <TouchableOpacity
+                  key={`${tab.id ?? 'all'}-${tab.name}`}
+                  onPress={() => onCategoryPress?.(tab)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.categoryTabText, isActive && styles.categoryTabTextActive]}>
+                    {tab.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        ) : (
+          <Text style={styles.title}>{title}</Text>
+        )}
         {onExpand && items.length > 0 ? (
           <Pressable style={styles.expandBtn} onPress={onExpand} hitSlop={8}>
             <Ionicons name="chevron-forward" size={22} color={theme.gray} />
@@ -94,19 +120,23 @@ export default function HomeShowSection({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {items.map((item) => (
-            renderItem ? (
-              <View key={item.id || item.show_id || item.history_id} style={styles.cardSlot}>
-                {renderItem(item)}
-              </View>
-            ) : (
-              <SectionCard
-                key={item.id || item.show_id}
-                item={item}
-                onPress={() => onItemPress?.(item)}
-              />
-            )
-          ))}
+          {items.map((item, index) => {
+            const itemId = item.id || item.show_id || item.history_id || item.bookmark_id || 'item';
+            const itemKey = `${itemId}-${index}`;
+            return (
+              renderItem ? (
+                <View key={itemKey} style={styles.cardSlot}>
+                  {renderItem(item)}
+                </View>
+              ) : (
+                <SectionCard
+                  key={itemKey}
+                  item={item}
+                  onPress={() => onItemPress?.(item)}
+                />
+              )
+            );
+          })}
         </ScrollView>
       )}
     </View>
@@ -123,14 +153,33 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
     paddingHorizontal: 4,
+    gap: 10,
   },
   title: {
     color: theme.white,
     fontSize: 18,
     fontWeight: '800',
   },
+  categoryTabContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 22,
+    paddingRight: 6,
+  },
+  categoryTabText: {
+    color: '#999',
+    fontSize: 18,
+    fontWeight: '800',
+    paddingBottom: 5,
+  },
+  categoryTabTextActive: {
+    color: theme.white,
+    borderBottomWidth: 2,
+    borderBottomColor: theme.white,
+  },
   expandBtn: {
     padding: 4,
+    flexShrink: 0,
   },
   scrollContent: {
     paddingHorizontal: 4,

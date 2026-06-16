@@ -35,6 +35,7 @@ import {
 } from '../../redux/slices/myListSlice';
 import { unlockEpisode } from '../../redux/slices/showPlayerSlice';
 import { usePlaybackSpeed } from '../../context/PlaybackSpeedContext';
+import { usePlaybackVolume } from '../../context/PlaybackVolumeContext';
 import { useVideoQuality } from '../../context/VideoQualityContext';
 import { useGuestAuth } from '../../context/GuestAuthContext';
 
@@ -69,6 +70,8 @@ export default function ShortVideoReelItem({
   showViewsAction = false,
   repeatPlayback = true,
   shouldPreload = false,
+  autoAdvanceOnEnd = true,
+  onPlaybackEnd = null,
 }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -79,6 +82,12 @@ export default function ShortVideoReelItem({
   const bookmarksLoaded = useSelector(selectBookmarksLoaded);
   const { speed: playbackRate, setSpeed, speeds: speedOptions } = usePlaybackSpeed();
   const {
+    volume,
+    muted,
+    setVolume,
+    toggleMuted,
+  } = usePlaybackVolume();
+  const {
     quality,
     setQuality,
     options: qualityOptions,
@@ -87,6 +96,7 @@ export default function ShortVideoReelItem({
   } = useVideoQuality();
   const [speedModalVisible, setSpeedModalVisible] = useState(false);
   const [qualityModalVisible, setQualityModalVisible] = useState(false);
+  const [volumePanelVisible, setVolumePanelVisible] = useState(false);
   const [videoError, setVideoError] = useState(null);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [controlsInteractionTick, setControlsInteractionTick] = useState(0);
@@ -149,6 +159,7 @@ export default function ShortVideoReelItem({
   const videoIsVisible = isActive && shouldRenderVideo && firstFrameReady;
   const showActiveBuffering = isActive && shouldRenderVideo && !firstFrameReady;
   const showMainOverlay = showOttOverlayControls || controlsVisible || manuallyPaused;
+  const effectiveMuted = muted || volume <= 0;
 
   useEffect(() => {
     if (shouldRenderVideo) return;
@@ -201,10 +212,15 @@ export default function ShortVideoReelItem({
     seekTo(Math.min(max, (currentTime || 0) + 10));
   }, [seekTo, currentTime, duration, item.duration_sec]);
 
+  const handlePlaybackEnd = useCallback(() => {
+    setControlsVisible(true);
+    onPlaybackEnd?.(item);
+  }, [item, onPlaybackEnd]);
+
   const renderSeekControls = () => (
     <View style={styles.ottSeekRow}>
       <Pressable style={styles.ottSeekBtn} onPress={handleSkipBack} hitSlop={12}>
-        <MaterialCommunityIcons name="rewind-10" size={42} color="#fff" />
+        <MaterialCommunityIcons name="rewind-10" size={32} color="#fff" />
       </Pressable>
       <Pressable
         style={styles.ottPlayPauseFab}
@@ -213,13 +229,13 @@ export default function ShortVideoReelItem({
       >
         <Ionicons
           name={manuallyPaused ? 'play' : 'pause'}
-          size={44}
+          size={38}
           color="#fff"
           style={manuallyPaused ? styles.playIconNudge : undefined}
         />
       </Pressable>
       <Pressable style={styles.ottSeekBtn} onPress={handleSkipForward} hitSlop={12}>
-        <MaterialCommunityIcons name="fast-forward-10" size={42} color="#fff" />
+        <MaterialCommunityIcons name="fast-forward-10" size={32} color="#fff" />
       </Pressable>
     </View>
   );
@@ -338,6 +354,17 @@ export default function ShortVideoReelItem({
     }
   }, [item.show_title, item.show_id, item.episode_num]);
 
+  const renderVolumeControl = () => (
+    <VolumeControl
+      muted={effectiveMuted}
+      volume={volume}
+      setVolume={setVolume}
+      toggleMuted={toggleMuted}
+      visible={volumePanelVisible}
+      setVisible={setVolumePanelVisible}
+    />
+  );
+
   const topOverlay = renderTopOverlay
     ? renderTopOverlay({ insets, item })
     : showOttOverlayControls
@@ -370,13 +397,16 @@ export default function ShortVideoReelItem({
               resizeMode="cover"
               paused={paused}
               rate={playbackRate}
-              repeat={repeatPlayback}
+              repeat={repeatPlayback && !autoAdvanceOnEnd}
+              muted={effectiveMuted}
+              volume={volume}
               controls={false}
               selectedVideoTrack={firstFrameReady ? AUTO_VIDEO_TRACK : STARTUP_VIDEO_TRACK}
               maxBitRate={maxBitRate}
               progressUpdateInterval={500}
               onLoad={wrappedOnLoad}
               onProgress={onProgress}
+              onEnd={handlePlaybackEnd}
               onReadyForDisplay={onReadyForDisplay}
               onError={(e) => {
                 const msg = e?.error?.localizedDescription || e?.error?.code || 'Playback error';
@@ -403,13 +433,16 @@ export default function ShortVideoReelItem({
                 resizeMode="cover"
                 paused={paused}
                 rate={playbackRate}
-                repeat={repeatPlayback}
+                repeat={repeatPlayback && !autoAdvanceOnEnd}
+                muted={effectiveMuted}
+                volume={volume}
                 controls={false}
                 selectedVideoTrack={firstFrameReady ? AUTO_VIDEO_TRACK : STARTUP_VIDEO_TRACK}
                 maxBitRate={maxBitRate}
                 progressUpdateInterval={500}
                 onLoad={wrappedOnLoad}
                 onProgress={onProgress}
+                onEnd={handlePlaybackEnd}
                 onReadyForDisplay={onReadyForDisplay}
                 onError={(e) => {
                   const msg = e?.error?.localizedDescription || e?.error?.code || 'Playback error';
@@ -446,6 +479,7 @@ export default function ShortVideoReelItem({
         <View style={styles.ottChromeRoot} pointerEvents="box-none">
           <View style={[styles.ottTopBar, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
             <View style={{ flex: 1 }} />
+            {renderVolumeControl()}
             <Pressable
               style={[styles.speedChipTop, styles.qualityChipTop]}
               onPress={() => setQualityModalVisible(true)}
@@ -522,6 +556,7 @@ export default function ShortVideoReelItem({
 
           <View style={[styles.ottTopBar, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
             <View style={{ flex: 1 }} />
+            {renderVolumeControl()}
             <Pressable
               style={[styles.speedChipTop, styles.qualityChipTop]}
               onPress={() => setQualityModalVisible(true)}
@@ -649,7 +684,7 @@ export default function ShortVideoReelItem({
               label="Episodes"
               onPress={handleOpenEpisodesOrReturn}
             />
-            <SideAction icon="share-social" label="Share" onPress={handleShare} />
+            <SideAction icon="paper-plane-outline" label="Share" onPress={handleShare} />
             {showViewsAction ? (
               <SideAction
                 icon="eye-outline"
@@ -724,6 +759,52 @@ export default function ShortVideoReelItem({
       </Animated.View>
 
       {topOverlay}
+    </View>
+  );
+}
+
+function VolumeControl({ muted, volume, setVolume, toggleMuted, visible, setVisible }) {
+  const [trackWidth, setTrackWidth] = useState(0);
+  const iconName = muted
+    ? 'volume-mute'
+    : volume < 0.45
+      ? 'volume-low'
+      : 'volume-high';
+
+  const updateVolumeFromPress = useCallback((event) => {
+    if (!trackWidth) return;
+    const next = event.nativeEvent.locationX / trackWidth;
+    setVolume(next);
+  }, [setVolume, trackWidth]);
+
+  return (
+    <View style={styles.volumeControlWrap}>
+      <Pressable
+        style={[styles.volumeIconButton, visible && styles.volumeIconButtonActive]}
+        onPress={() => setVisible((current) => !current)}
+        hitSlop={10}
+      >
+        <Ionicons name={iconName} size={18} color="#fff" />
+      </Pressable>
+
+      {visible ? (
+        <View style={styles.volumePanel}>
+          <Pressable style={styles.volumeMuteButton} onPress={toggleMuted} hitSlop={8}>
+            <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={17} color="#fff" />
+          </Pressable>
+          <Pressable
+            style={styles.volumeTrackHit}
+            onPress={updateVolumeFromPress}
+            onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
+          >
+            <View style={styles.volumeTrack}>
+              <View style={[styles.volumeFill, { width: `${Math.round(volume * 100)}%` }]} />
+              <View style={[styles.volumeThumb, { left: `${Math.round(volume * 100)}%` }]} />
+            </View>
+          </Pressable>
+          <Text style={styles.volumeText}>{muted ? '0' : Math.round(volume * 100)}%</Text>
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -65,6 +65,19 @@ function formatViews(viewCount) {
   return String(viewCount);
 }
 
+function sameCategoryId(a, b) {
+  return String(a ?? 'all') === String(b ?? 'all');
+}
+
+function showMatchesCategory(show, tab) {
+  if (!tab?.id) return true;
+  const categoryId = String(tab.id);
+  return String(show.category_id) === categoryId
+    || String(show.category?.id) === categoryId
+    || show.category_name === tab.name
+    || show.category === tab.name;
+}
+
 const DramaCard = ({ item, onPress }) => (
   <TouchableOpacity style={styles.cardContainer} onPress={onPress} activeOpacity={0.85}>
     <View style={styles.imageWrapper}>
@@ -199,19 +212,27 @@ export default function PopularScreen() {
 
   const isSearchActive = Boolean(effectiveSearch);
   const trendingShows = useMemo(() => shows.slice(0, 5), [shows]);
-  const allShowsPreview = useMemo(() => shows.slice(0, 12), [shows]);
+  const activeCategory = useMemo(
+    () => tabs.find((tab) => sameCategoryId(tab.id, activeTab)) || tabs[0] || { id: null, name: 'All' },
+    [tabs, activeTab]
+  );
+  const categoryShowsPreview = useMemo(
+    () => shows.filter((show) => showMatchesCategory(show, activeCategory)).slice(0, 12),
+    [shows, activeCategory]
+  );
 
   const expandedItems = useMemo(() => {
     if (!expandedSection) return [];
     if (expandedSection === 'all') {
-      if (!expandedCategoryTab) return shows;
-      return shows.filter((s) => s.category_id === expandedCategoryTab);
+      const selectedExpandedTab = tabs.find((tab) => sameCategoryId(tab.id, expandedCategoryTab))
+        || { id: null, name: 'All' };
+      return shows.filter((show) => showMatchesCategory(show, selectedExpandedTab));
     }
     if (expandedSection === 'trending') return trendingShows;
     if (expandedSection === 'continue') return watchHistory;
     if (expandedSection === 'saved') return bookmarks;
     return [];
-  }, [expandedSection, shows, trendingShows, watchHistory, bookmarks, expandedCategoryTab]);
+  }, [expandedSection, shows, tabs, trendingShows, watchHistory, bookmarks, expandedCategoryTab]);
 
   useEffect(() => {
     filterPanelOpenRef.current = filterPanelOpen;
@@ -348,8 +369,7 @@ export default function PopularScreen() {
     (item, initialTab = 'synopsis', options = {}) => {
       if (options.fromRelated && selected) {
         setSheetHistory((history) => [
-          ...history,
-          { item: selected, initialTab: sheetInitialTab },
+          history[0] || { item: selected, initialTab: sheetInitialTab },
         ]);
       } else {
         setSheetHistory([]);
@@ -515,14 +535,14 @@ export default function PopularScreen() {
   }, [dispatch, navigation]);
 
   const openExpandedAll = useCallback(() => {
-    setExpandedCategoryTab(null);
+    setExpandedCategoryTab(activeTab);
     setExpandedSection('all');
-  }, []);
+  }, [activeTab]);
 
   const handleCloseSheet = () => {
     if (sheetHistory.length > 0) {
-      const previous = sheetHistory[sheetHistory.length - 1];
-      setSheetHistory((history) => history.slice(0, -1));
+      const previous = sheetHistory[0];
+      setSheetHistory([]);
       setDramaSheetKey((k) => k + 1);
       setSelected(previous.item);
       setSheetInitialTab(previous.initialTab || 'synopsis');
@@ -625,7 +645,7 @@ export default function PopularScreen() {
                       const isThirdColumn = (index + 1) % 3 === 0;
                       return (
                         <TouchableOpacity
-                          key={tag.id}
+                          key={`${tag.id || tag.name || 'tag'}-${index}`}
                           style={[
                             styles.tagSearchItem,
                             isThirdColumn && styles.tagSearchItemLastInRow,
@@ -690,7 +710,7 @@ export default function PopularScreen() {
         <FlatList
           data={shows}
           renderItem={({ item }) => <DramaCard item={item} onPress={() => openDetails(item)} />}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item, index) => `${item.id || item.show_id || 'show'}-${index}`}
           numColumns={3}
           contentContainerStyle={styles.listContent}
           columnWrapperStyle={styles.columnWrapper}
@@ -708,9 +728,13 @@ export default function PopularScreen() {
 
           <HomeShowSection
             title="All"
-            items={allShowsPreview}
+            items={categoryShowsPreview}
             onItemPress={(item) => openDetails(item)}
             onExpand={openExpandedAll}
+            categoryTabs={tabs}
+            activeCategoryId={activeTab}
+            onCategoryPress={(tab) => setActiveTab(tab.id)}
+            emptyText="No dramas found."
           />
 
           <HomeShowSection
@@ -790,13 +814,13 @@ export default function PopularScreen() {
               >
                 {tabs.map((tab) => (
                   <TouchableOpacity
-                    key={tab.id ?? 'all'}
+                    key={`${tab.id ?? 'all'}-${tab.name}`}
                     onPress={() => setExpandedCategoryTab(tab.id)}
                   >
                     <Text
                       style={[
                         styles.tabText,
-                        expandedCategoryTab === tab.id && styles.activeTabText,
+                        sameCategoryId(expandedCategoryTab, tab.id) && styles.activeTabText,
                       ]}
                     >
                       {tab.name}
@@ -809,7 +833,7 @@ export default function PopularScreen() {
 
           <FlatList
             data={expandedItems}
-            keyExtractor={(item, index) => String(item.id || item.show_id || item.history_id || item.bookmark_id || index)}
+            keyExtractor={(item, index) => `${item.id || item.show_id || item.history_id || item.bookmark_id || 'expanded'}-${index}`}
             numColumns={3}
             contentContainerStyle={styles.listContent}
             columnWrapperStyle={styles.columnWrapper}

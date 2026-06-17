@@ -104,6 +104,15 @@ export default function ShortVideoReelItem({
   const [videoError, setVideoError] = useState(null);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [controlsInteractionTick, setControlsInteractionTick] = useState(0);
+  
+  const [synopsisExpanded, setSynopsisExpanded] = useState(false);
+  const [synopsisTruncated, setSynopsisTruncated] = useState(false);
+
+  useEffect(() => {
+    setSynopsisExpanded(false);
+    setSynopsisTruncated(false);
+  }, [item.episode_id]);
+
   const controlsOpacity = useRef(new Animated.Value(1)).current;
   const hideControlsTimerRef = useRef(null);
   const layoutHeight = itemHeight || SCREEN_HEIGHT;
@@ -742,9 +751,37 @@ export default function ShortVideoReelItem({
             </View>
 
             {item.synopsis ? (
-              <Text style={styles.descText} numberOfLines={2}>
-                {item.synopsis}
-              </Text>
+              <View style={styles.synopsisContainer}>
+                {!synopsisTruncated && (
+                  <Text
+                    style={[styles.descText, { position: 'absolute', opacity: 0, zIndex: -1000 }]}
+                    onTextLayout={(e) => {
+                      if (e.nativeEvent.lines.length > 2) {
+                        setSynopsisTruncated(true);
+                      }
+                    }}
+                  >
+                    {item.synopsis}
+                  </Text>
+                )}
+                <Text
+                  style={[styles.descText, synopsisTruncated && { marginBottom: 2 }]}
+                  numberOfLines={synopsisExpanded ? undefined : 2}
+                >
+                  {item.synopsis}
+                </Text>
+                {synopsisTruncated && (
+                  <TouchableOpacity
+                    onPress={() => setSynopsisExpanded(!synopsisExpanded)}
+                    style={styles.moreLessButton}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.moreLessText}>
+                      {synopsisExpanded ? 'less' : 'more'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             ) : null}
 
             {!isLocked && firstFrameReady ? (

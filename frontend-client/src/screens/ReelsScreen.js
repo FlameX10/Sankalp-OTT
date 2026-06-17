@@ -259,7 +259,7 @@ export default function PopularScreen() {
 
   const handleSearchFocus = useCallback(() => {
     setSearchInputFocused(true);
-    setFilterPanelOpen(false);
+    setFilterPanelOpen(true);
   }, []);
 
   const handleSearchBlur = useCallback(() => {

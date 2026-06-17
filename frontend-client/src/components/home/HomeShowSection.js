@@ -98,14 +98,26 @@ export default function HomeShowSection({
             contentContainerStyle={styles.categoryTabContent}
           >
             {categoryTabs.map((tab) => {
-              const isActive = String(tab.id ?? 'all') === String(activeCategoryId ?? 'all');
+              const isActive =
+                String(tab.id ?? 'all') === String(activeCategoryId ?? 'all');
+
               return (
                 <TouchableOpacity
                   key={`${tab.id ?? 'all'}-${tab.name}`}
                   onPress={() => onCategoryPress?.(tab)}
                   activeOpacity={0.8}
+                  style={[
+                    styles.categoryTab,
+                    isActive && styles.categoryTabActive,
+                  ]}
                 >
-                  <Text style={[styles.categoryTabText, isActive && styles.categoryTabTextActive]}>
+                  <Text
+                    style={[
+                      styles.categoryTabText,
+                      isActive && styles.categoryTabTextActive,
+                    ]}
+                    numberOfLines={1}
+                  >
                     {tab.name}
                   </Text>
                 </TouchableOpacity>
@@ -152,11 +164,11 @@ export default function HomeShowSection({
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   section: {
     marginBottom: 22,
   },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -165,45 +177,65 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     gap: 10,
   },
+
   title: {
     color: theme.white,
     fontSize: 18,
     fontWeight: '800',
   },
+
   categoryTabContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 22,
+    gap: 10,
     paddingRight: 6,
   },
+
+  // Updated Category Tab Style
   categoryTabText: {
     color: '#999',
-    fontSize: 18,
-    fontWeight: '800',
-    paddingBottom: 5,
+    fontSize: 15,
+    fontWeight: '700',
+
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#555',
+    borderRadius: 18,
+
+    overflow: 'hidden',
   },
+
+  // Updated Active Category Tab Style
   categoryTabTextActive: {
     color: theme.white,
-    borderBottomWidth: 2,
-    borderBottomColor: theme.white,
+    borderColor: theme.white,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
+
   expandBtn: {
     padding: 4,
     flexShrink: 0,
   },
+
   scrollContent: {
     paddingHorizontal: 4,
     gap: 10,
   },
+
   cardSlot: {
     marginRight: 0,
   },
+
   card: {
     width: CARD_WIDTH,
   },
+
   cardCompact: {
     width: 140,
   },
+
   posterWrap: {
     width: '100%',
     aspectRatio: 0.7,
@@ -212,13 +244,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A1A',
     position: 'relative',
   },
+
   poster: {
     width: '100%',
     height: '100%',
   },
+
   posterFallback: {
     backgroundColor: theme.surface,
   },
+
   viewBadge: {
     position: 'absolute',
     bottom: 5,
@@ -231,11 +266,13 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 10,
   },
+
   viewText: {
     color: '#fff',
     fontSize: 10,
     fontWeight: '600',
   },
+
   cardTitle: {
     color: theme.white,
     fontSize: 12,
@@ -243,18 +280,21 @@ const styles = StyleSheet.create({
     marginTop: 6,
     lineHeight: 16,
   },
+
   cardTags: {
     color: '#E0E0E0',
     fontSize: 10,
     fontWeight: '400',
     marginTop: 3,
   },
+
   cardCategory: {
     color: '#E0E0E0',
     fontSize: 10,
     fontWeight: '400',
     marginTop: 3,
   },
+
   progressBarTrack: {
     position: 'absolute',
     bottom: 0,
@@ -263,11 +303,13 @@ const styles = StyleSheet.create({
     height: 3,
     backgroundColor: 'rgba(255,255,255,0.25)',
   },
+
   progressBarFill: {
     height: '100%',
     backgroundColor: theme.crimson,
     borderRadius: 2,
   },
+
   empty: {
     color: theme.gray,
     fontSize: 13,

@@ -106,6 +106,17 @@ function ShowCard({ item, onPress, onLongPress, selectionMode, selected }) {
       onPress={onPress}
       onLongPress={onLongPress}
     >
+      {/* Checkbox on left side in selection mode */}
+      {selectionMode && (
+        <View style={cardStyles.selectIconWrap}>
+          <Ionicons
+            name={selected ? "checkmark-circle" : "ellipse-outline"}
+            size={24}
+            color={selected ? theme.crimson : theme.white}
+          />
+        </View>
+      )}
+
       {/* Thumbnail */}
       <View style={cardStyles.thumbnailWrap}>
         {resolvedThumbnailUrl ? (
@@ -118,14 +129,12 @@ function ShowCard({ item, onPress, onLongPress, selectionMode, selected }) {
           <View style={[cardStyles.thumbnail, { backgroundColor: theme.surface }]} />
         )}
 
-        {/* Play icon overlay / Selection overlay */}
-        <View style={cardStyles.playOverlay}>
-          {selectionMode ? (
-            <Ionicons name={selected ? "checkmark-circle" : "ellipse-outline"} size={24} color={selected ? theme.crimson : theme.white} />
-          ) : (
+        {/* Play icon overlay */}
+        {!selectionMode && (
+          <View style={cardStyles.playOverlay}>
             <Ionicons name="play" size={18} color={theme.white} />
-          )}
-        </View>
+          </View>
+        )}
 
         {/* Progress bar at bottom of thumbnail */}
         <ThumbnailProgressBar
@@ -164,6 +173,12 @@ const cardStyles = StyleSheet.create({
     height: 110,
     marginBottom: 14,
     position: 'relative',
+  },
+  selectIconWrap: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingLeft: 14,
+    paddingRight: 2,
   },
   deleteBtn: {
     position: 'absolute',

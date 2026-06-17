@@ -75,6 +75,19 @@ export const styles = StyleSheet.create({
     marginBottom: 10,
     paddingRight: 50,
   },
+  synopsisContainer: {
+    width: '100%',
+  },
+  moreLessButton: {
+    alignSelf: 'flex-start',
+    marginTop: 2,
+    marginBottom: 10,
+  },
+  moreLessText: {
+    color: shortVideoTheme.crimson,
+    fontSize: 14,
+    fontWeight: '700',
+  },
 
   progressContainer: { marginBottom: 12 },
   progressBarHitArea: {

@@ -4,6 +4,7 @@ import {
   Animated,
   Image,
   Modal,
+  Platform,
   Pressable,
   Share,
   StatusBar,
@@ -13,11 +14,12 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import Video from 'react-native-video';
+import { CaptureProtection, useCaptureProtection } from 'react-native-capture-protection';
 
 import ProgressBar from './ProgressBar';
 import SideAction from './SideAction';
@@ -35,6 +37,7 @@ import {
 } from '../../redux/slices/myListSlice';
 import { unlockEpisode } from '../../redux/slices/showPlayerSlice';
 import { usePlaybackSpeed } from '../../context/PlaybackSpeedContext';
+import { usePlaybackVolume } from '../../context/PlaybackVolumeContext';
 import { useVideoQuality } from '../../context/VideoQualityContext';
 import { useGuestAuth } from '../../context/GuestAuthContext';
 
@@ -69,15 +72,25 @@ export default function ShortVideoReelItem({
   showViewsAction = false,
   repeatPlayback = true,
   shouldPreload = false,
+  autoAdvanceOnEnd = true,
+  onPlaybackEnd = null,
 }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const dispatch = useDispatch();
 
+  const { status } = useCaptureProtection();
+
   const accessToken = useSelector((state) => state.auth?.accessToken);
   const isBookmarked = useSelector(selectIsBookmarked(item.show_id));
   const bookmarksLoaded = useSelector(selectBookmarksLoaded);
   const { speed: playbackRate, setSpeed, speeds: speedOptions } = usePlaybackSpeed();
+  const {
+    volume,
+    muted,
+    setVolume,
+    toggleMuted,
+  } = usePlaybackVolume();
   const {
     quality,
     setQuality,
@@ -87,9 +100,19 @@ export default function ShortVideoReelItem({
   } = useVideoQuality();
   const [speedModalVisible, setSpeedModalVisible] = useState(false);
   const [qualityModalVisible, setQualityModalVisible] = useState(false);
+  const [volumePanelVisible, setVolumePanelVisible] = useState(false);
   const [videoError, setVideoError] = useState(null);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [controlsInteractionTick, setControlsInteractionTick] = useState(0);
+  
+  const [synopsisExpanded, setSynopsisExpanded] = useState(false);
+  const [synopsisTruncated, setSynopsisTruncated] = useState(false);
+
+  useEffect(() => {
+    setSynopsisExpanded(false);
+    setSynopsisTruncated(false);
+  }, [item.episode_id]);
+
   const controlsOpacity = useRef(new Animated.Value(1)).current;
   const hideControlsTimerRef = useRef(null);
   const layoutHeight = itemHeight || SCREEN_HEIGHT;
@@ -112,6 +135,19 @@ export default function ShortVideoReelItem({
   const isLocked = item.is_locked;
   const streamUrl = !isLocked && item.hls_url ? `${streamBase}${item.hls_url}` : null;
   
+  useEffect(() => {
+    CaptureProtection.prevent({
+      screenshot: true,
+      record: true,
+      appSwitcher: true,
+    });
+    return () => {
+      CaptureProtection.allow();
+    };
+  }, []);
+
+  const isBeingRecorded = Platform.OS === 'ios' && status?.record === true;
+
   // Log streamUrl setup for debugging
   useEffect(() => {
     //console.log(`📺 ShortVideoReelItem mounted - Episode: ${item.episode_num}, Locked: ${isLocked}, URL: ${streamUrl?.substring(0, 80)}...`);
@@ -149,6 +185,15 @@ export default function ShortVideoReelItem({
   const videoIsVisible = isActive && shouldRenderVideo && firstFrameReady;
   const showActiveBuffering = isActive && shouldRenderVideo && !firstFrameReady;
   const showMainOverlay = showOttOverlayControls || controlsVisible || manuallyPaused;
+  const effectiveMuted = muted || volume <= 0;
+
+  useEffect(() => {
+    if (isBeingRecorded) {
+      if (!paused && !manuallyPaused) {
+        setManualPaused(true);
+      }
+    }
+  }, [isBeingRecorded, paused, manuallyPaused, setManualPaused]);
 
   useEffect(() => {
     if (shouldRenderVideo) return;
@@ -191,6 +236,43 @@ export default function ShortVideoReelItem({
       onFirstFrameReady();
     }
   }, [originalOnReadyForDisplay, onFirstFrameReady, item.episode_num]);
+
+  const handleSkipBack = useCallback(() => {
+    seekTo(Math.max(0, (currentTime || 0) - 10));
+  }, [seekTo, currentTime]);
+
+  const handleSkipForward = useCallback(() => {
+    const max = duration || item.duration_sec || 0;
+    seekTo(Math.min(max, (currentTime || 0) + 10));
+  }, [seekTo, currentTime, duration, item.duration_sec]);
+
+  const handlePlaybackEnd = useCallback(() => {
+    setControlsVisible(true);
+    onPlaybackEnd?.(item);
+  }, [item, onPlaybackEnd]);
+
+  const renderSeekControls = () => (
+    <View style={styles.ottSeekRow}>
+      <Pressable style={styles.ottSeekBtn} onPress={handleSkipBack} hitSlop={12}>
+        <MaterialCommunityIcons name="rewind-10" size={32} color="#fff" />
+      </Pressable>
+      <Pressable
+        style={styles.ottPlayPauseFab}
+        onPress={handlePlayPausePress}
+        hitSlop={16}
+      >
+        <Ionicons
+          name={manuallyPaused ? 'play' : 'pause'}
+          size={38}
+          color="#fff"
+          style={manuallyPaused ? styles.playIconNudge : undefined}
+        />
+      </Pressable>
+      <Pressable style={styles.ottSeekBtn} onPress={handleSkipForward} hitSlop={12}>
+        <MaterialCommunityIcons name="fast-forward-10" size={32} color="#fff" />
+      </Pressable>
+    </View>
+  );
 
   // Bookmark press handler — passes full item data for optimistic local update in Redux
   const handleBookmarkPress = useCallback(() => {
@@ -306,6 +388,17 @@ export default function ShortVideoReelItem({
     }
   }, [item.show_title, item.show_id, item.episode_num]);
 
+  const renderVolumeControl = () => (
+    <VolumeControl
+      muted={effectiveMuted}
+      volume={volume}
+      setVolume={setVolume}
+      toggleMuted={toggleMuted}
+      visible={volumePanelVisible}
+      setVisible={setVolumePanelVisible}
+    />
+  );
+
   const topOverlay = renderTopOverlay
     ? renderTopOverlay({ insets, item })
     : showOttOverlayControls
@@ -338,13 +431,16 @@ export default function ShortVideoReelItem({
               resizeMode="cover"
               paused={paused}
               rate={playbackRate}
-              repeat={repeatPlayback}
+              repeat={repeatPlayback && !autoAdvanceOnEnd}
+              muted={effectiveMuted}
+              volume={volume}
               controls={false}
               selectedVideoTrack={firstFrameReady ? AUTO_VIDEO_TRACK : STARTUP_VIDEO_TRACK}
               maxBitRate={maxBitRate}
               progressUpdateInterval={500}
               onLoad={wrappedOnLoad}
               onProgress={onProgress}
+              onEnd={handlePlaybackEnd}
               onReadyForDisplay={onReadyForDisplay}
               onError={(e) => {
                 const msg = e?.error?.localizedDescription || e?.error?.code || 'Playback error';
@@ -371,13 +467,16 @@ export default function ShortVideoReelItem({
                 resizeMode="cover"
                 paused={paused}
                 rate={playbackRate}
-                repeat={repeatPlayback}
+                repeat={repeatPlayback && !autoAdvanceOnEnd}
+                muted={effectiveMuted}
+                volume={volume}
                 controls={false}
                 selectedVideoTrack={firstFrameReady ? AUTO_VIDEO_TRACK : STARTUP_VIDEO_TRACK}
                 maxBitRate={maxBitRate}
                 progressUpdateInterval={500}
                 onLoad={wrappedOnLoad}
                 onProgress={onProgress}
+                onEnd={handlePlaybackEnd}
                 onReadyForDisplay={onReadyForDisplay}
                 onError={(e) => {
                   const msg = e?.error?.localizedDescription || e?.error?.code || 'Playback error';
@@ -414,6 +513,7 @@ export default function ShortVideoReelItem({
         <View style={styles.ottChromeRoot} pointerEvents="box-none">
           <View style={[styles.ottTopBar, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
             <View style={{ flex: 1 }} />
+            {renderVolumeControl()}
             <Pressable
               style={[styles.speedChipTop, styles.qualityChipTop]}
               onPress={() => setQualityModalVisible(true)}
@@ -438,18 +538,7 @@ export default function ShortVideoReelItem({
             style={[styles.ottCenterWrap, { opacity: controlsOpacity }]}
             pointerEvents={showMainOverlay ? 'box-none' : 'none'}
           >
-            <Pressable
-              style={styles.ottPlayPauseFab}
-              onPress={handlePlayPausePress}
-              hitSlop={16}
-            >
-              <Ionicons
-                name={manuallyPaused ? 'play' : 'pause'}
-                size={44}
-                color="#fff"
-                style={manuallyPaused ? styles.playIconNudge : undefined}
-              />
-            </Pressable>
+            {renderSeekControls()}
           </Animated.View>
         </View>
       ) : null}
@@ -501,6 +590,7 @@ export default function ShortVideoReelItem({
 
           <View style={[styles.ottTopBar, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
             <View style={{ flex: 1 }} />
+            {renderVolumeControl()}
             <Pressable
               style={[styles.speedChipTop, styles.qualityChipTop]}
               onPress={() => setQualityModalVisible(true)}
@@ -523,18 +613,7 @@ export default function ShortVideoReelItem({
 
           {(controlsVisible || manuallyPaused) ? (
             <View style={styles.ottCenterWrap} pointerEvents="box-none">
-              <Pressable
-                style={styles.ottPlayPauseFab}
-                onPress={handlePlayPausePress}
-                hitSlop={16}
-              >
-                <Ionicons
-                  name={manuallyPaused ? 'play' : 'pause'}
-                  size={44}
-                  color="#fff"
-                  style={manuallyPaused ? styles.playIconNudge : undefined}
-                />
-              </Pressable>
+              {renderSeekControls()}
             </View>
           ) : null}
         </View>
@@ -639,7 +718,7 @@ export default function ShortVideoReelItem({
               label="Episodes"
               onPress={handleOpenEpisodesOrReturn}
             />
-            <SideAction icon="share-social" label="Share" onPress={handleShare} />
+            <SideAction icon="paper-plane-outline" label="Share" onPress={handleShare} />
             {showViewsAction ? (
               <SideAction
                 icon="eye-outline"
@@ -672,10 +751,37 @@ export default function ShortVideoReelItem({
             </View>
 
             {item.synopsis ? (
-              <Text style={styles.descText} numberOfLines={2}>
-                {item.synopsis}{' '}
-                <Text style={{ fontWeight: 'bold', color: '#fff' }}>more</Text>
-              </Text>
+              <View style={styles.synopsisContainer}>
+                {!synopsisTruncated && (
+                  <Text
+                    style={[styles.descText, { position: 'absolute', opacity: 0, zIndex: -1000 }]}
+                    onTextLayout={(e) => {
+                      if (e.nativeEvent.lines.length > 2) {
+                        setSynopsisTruncated(true);
+                      }
+                    }}
+                  >
+                    {item.synopsis}
+                  </Text>
+                )}
+                <Text
+                  style={[styles.descText, synopsisTruncated && { marginBottom: 2 }]}
+                  numberOfLines={synopsisExpanded ? undefined : 2}
+                >
+                  {item.synopsis}
+                </Text>
+                {synopsisTruncated && (
+                  <TouchableOpacity
+                    onPress={() => setSynopsisExpanded(!synopsisExpanded)}
+                    style={styles.moreLessButton}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.moreLessText}>
+                      {synopsisExpanded ? 'less' : 'more'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             ) : null}
 
             {!isLocked && firstFrameReady ? (
@@ -714,7 +820,63 @@ export default function ShortVideoReelItem({
           </View>
       </Animated.View>
 
+      {/* iOS screen recording overlay */}
+      {isBeingRecorded ? (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }]} pointerEvents="auto">
+          <Ionicons name="videocam-off" size={64} color="#fff" />
+          <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', marginTop: 16 }}>
+            Screen recording is not allowed
+          </Text>
+        </View>
+      ) : null}
+
       {topOverlay}
+    </View>
+  );
+}
+
+function VolumeControl({ muted, volume, setVolume, toggleMuted, visible, setVisible }) {
+  const [trackWidth, setTrackWidth] = useState(0);
+  const iconName = muted
+    ? 'volume-mute'
+    : volume < 0.45
+      ? 'volume-low'
+      : 'volume-high';
+
+  const updateVolumeFromPress = useCallback((event) => {
+    if (!trackWidth) return;
+    const next = event.nativeEvent.locationX / trackWidth;
+    setVolume(next);
+  }, [setVolume, trackWidth]);
+
+  return (
+    <View style={styles.volumeControlWrap}>
+      <Pressable
+        style={[styles.volumeIconButton, visible && styles.volumeIconButtonActive]}
+        onPress={() => setVisible((current) => !current)}
+        hitSlop={10}
+      >
+        <Ionicons name={iconName} size={18} color="#fff" />
+      </Pressable>
+
+      {visible ? (
+        <View style={styles.volumePanel}>
+          <Pressable style={styles.volumeMuteButton} onPress={toggleMuted} hitSlop={8}>
+            <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={17} color="#fff" />
+          </Pressable>
+          <Pressable
+            style={styles.volumeTrackHit}
+            onPress={updateVolumeFromPress}
+            onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
+          >
+            <View style={styles.volumeTrack}>
+              <View style={[styles.volumeFill, { width: `${Math.round(volume * 100)}%` }]} />
+              <View style={[styles.volumeThumb, { left: `${Math.round(volume * 100)}%` }]} />
+            </View>
+          </Pressable>
+          <Text style={styles.volumeText}>{muted ? '0' : Math.round(volume * 100)}%</Text>
+        </View>
+      ) : null}
     </View>
   );
 }

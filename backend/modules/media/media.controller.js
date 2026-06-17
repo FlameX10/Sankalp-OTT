@@ -27,6 +27,13 @@ async function uploadVideo(req, res, next) {
   } catch (e) { next(e); }
 }
 
+async function uploadImage(req, res, next) {
+  try {
+    const result = await mediaService.uploadImageFile(req.body.type, req.body.entity_id, req.file);
+    res.json(result);
+  } catch (e) { next(e); }
+}
+
 async function getImageUploadUrl(req, res, next) {
   try {
     const result = await mediaService.getImageUploadUrl(req.body.type, req.body.entity_id);
@@ -51,7 +58,10 @@ async function confirmImageUpload(req, res, next) {
 
 async function getPlayUrl(req, res, next) {
   try {
-    const result = await mediaService.getPlayUrl(req.params.episodeId);
+    const result = await mediaService.getPlayUrl(req.params.episodeId, {
+      userId: req.user?.id || null,
+      isGuest: req.isGuest || false,
+    });
     res.json(result);
   } catch (e) { next(e); }
 }
@@ -166,6 +176,6 @@ async function imageProxy(req, res, next) {
 }
 
 export {
-  getVideoUploadUrl, uploadVideo, getImageUploadUrl, confirmVideoUpload,
+  getVideoUploadUrl, uploadVideo, uploadImage, getImageUploadUrl, confirmVideoUpload,
   confirmImageUpload, getPlayUrl, getTranscodeStatus, hlsProxy, imageProxy,
 };

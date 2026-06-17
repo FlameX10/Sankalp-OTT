@@ -1,10 +1,8 @@
 import { prisma } from '../../prisma/client.js';
+import { getSignedEpisodeHlsPath } from '../../utils/hls-signed-url.js';
 
 function buildEpisodeHlsPath(episode) {
-  if (episode.status === 'ready' && episode.hls_master_url) {
-    return `/api/media/hls/${episode.show_id}/${episode.id}/master.m3u8`;
-  }
-  return null;
+  return getSignedEpisodeHlsPath(episode);
 }
 
 function buildUnlockResponse(episode, coins) {

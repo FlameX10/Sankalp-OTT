@@ -19,6 +19,7 @@ import { theme } from '../constants/theme';
 import { ROUTES } from '../constants/routes';
 import { useGuestAuth } from '../context/GuestAuthContext';
 import { fetchCheckinStatus } from '../components/rewards/dailyCheckinApi';
+import { formatMembershipEnd } from '../components/membership/membershipApi';
 import { logoutUser, clearLogoutError } from '../redux/slices/authSlice';
 
 const FEATURE_ICONS = [
@@ -119,6 +120,7 @@ export default function ProfileScreen({ navigation }) {
   const name = useSelector((state) => state.auth.name);
   const coins = useSelector((state) => state.auth.coins);
   const plan = useSelector((state) => state.auth.plan);
+  const membership = useSelector((state) => state.auth.membership);
   const isPaid = plan && plan !== 'FREE';
   const dispatch = useDispatch();
   const { logout: logoutState } = useSelector((state) => state.auth);
@@ -222,6 +224,11 @@ export default function ProfileScreen({ navigation }) {
               <Text style={styles.loginText}>{name || 'User'}</Text>
               <Ionicons name="chevron-forward" size={16} color={theme.white} />
             </View>
+            {isPaid && membership?.end_date ? (
+              <Text style={styles.membershipEndText}>
+                Member until {formatMembershipEnd(membership.end_date)}
+              </Text>
+            ) : null}
           </View>
         </View>
         <Pressable style={styles.coinsChip} onPress={goToMyWallet} hitSlop={8}>
@@ -348,6 +355,12 @@ const styles = StyleSheet.create({
     color: theme.white,
     fontSize: 17,
     fontWeight: '700',
+  },
+  membershipEndText: {
+    color: theme.gold,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 4,
   },
   memberLabelActive: {
     color: '#4CAF50',

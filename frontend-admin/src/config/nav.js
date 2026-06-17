@@ -12,7 +12,8 @@ export const NAV_CONFIG = [
     items: [
       { id: 'dramas',     label: 'Drama / Content',   badge: null },
       { id: 'categories', label: 'Categories & Tags',  badge: null },
-      { id: 'banners',    label: 'Banners & Popups',   badge: null },
+      { id: 'banners',       label: 'Banners & Popups',   badge: null },
+      { id: 'hero_banners',  label: 'Hero Section',       badge: null },
     ],
   },
   {
@@ -43,6 +44,7 @@ export const PAGE_META = {
   dramas:        { title: 'Drama / Content',      subtitle: 'Manage content library' },
   categories:    { title: 'Categories & Tags',    subtitle: 'Organise and tag content' },
   banners:       { title: 'Banners & Popups',     subtitle: 'Homepage promotions' },
+  hero_banners:  { title: 'Hero Section',         subtitle: 'Home page hero slider banners' },
   membership:    { title: 'Membership Plans',     subtitle: 'Plans and billing' },
   topup:         { title: 'Top-Up Plans',         subtitle: 'Coin package management' },
   coins:         { title: 'Coins & Wallet',       subtitle: 'Virtual currency management' },

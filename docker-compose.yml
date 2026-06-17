@@ -40,7 +40,7 @@ services:
       resources:
         limits:
           cpus: '1.0'
-          memory: 1g
+          memory: 50g
 
     restart: unless-stopped
     logging: *default-logging
@@ -102,8 +102,10 @@ services:
       - MINIO_SECRET_KEY=minioadmin123
       - MINIO_BUCKET=ott-media
       - MINIO_USE_SSL=false
-      - MINIO_PUBLIC_HOST=http://${LOCAL_IP}:9000
+      - MINIO_PUBLIC_HOST=http://${LOCAL_IP}:8080
       - SERVER_ORIGIN=http://${LOCAL_IP}:8080
+      - HLS_SIGNING_SECRET=0cc3d9a7f14d3cfe6eb43055be850b6a066b57c6564416ae18dc16573c75a6d5
+      - HLS_SIGNED_URL_TTL=7200
 
     depends_on:
       - postgres
@@ -142,7 +144,7 @@ services:
       - MINIO_SECRET_KEY=minioadmin123
       - MINIO_BUCKET=ott-media
       - MINIO_USE_SSL=false
-      - MINIO_PUBLIC_HOST=http://${LOCAL_IP}:9000
+      - MINIO_PUBLIC_HOST=http://${LOCAL_IP}:8080
       - SERVER_ORIGIN=http://${LOCAL_IP}:8080
 
     depends_on:
@@ -217,7 +219,9 @@ services:
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin123
-      MINIO_API_CORS_ALLOW_ORIGIN: "http://${LOCAL_IP},http://${LOCAL_IP}:8080,http://localhost,http://localhost:80,http://localhost:8080"
+      MINIO_SERVER_URL: http://${LOCAL_IP}:8080
+      MINIO_BROWSER_REDIRECT_URL: http://${LOCAL_IP}:8080/minio-console
+      MINIO_API_CORS_ALLOW_ORIGIN: "http://${LOCAL_IP},http://${LOCAL_IP}:8080,http://localhost,http://localhost:80"
 
     volumes:
       - minio_data:/data
@@ -235,10 +239,15 @@ services:
     build: ./backend
     container_name: ott-prisma-studio
 
-    command: npx prisma studio --port 5555 --browser none --hostname 0.0.0.0
+    command: >
+      sh -c "npx prisma generate && npx prisma studio --port 5555 --browser none --hostname 0.0.0.0"
 
     ports:
       - "5555:5555"
+
+    volumes:
+      # Keep Prisma Studio in sync with local schema without rebuilding the image
+      - ./backend/prisma:/app/prisma
 
     environment:
       - DATABASE_URL=postgresql://ottdev:ottdev123@postgres:5432/ott_dev
@@ -251,7 +260,7 @@ services:
       resources:
         limits:
           cpus: '0.5'
-          memory: 512m
+          memory: 1g
 
     restart: unless-stopped
     logging: *default-logging

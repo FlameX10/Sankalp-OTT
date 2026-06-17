@@ -692,6 +692,170 @@ export async function deleteBanner(req, res, next) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────
+// HERO BANNER CRUD (home page slider)
+// ─────────────────────────────────────────────────────────────────
+
+function formatHeroBanner(b) {
+  return {
+    id: b.id,
+    title: b.title,
+    image_url: b.image_url,
+    show_id: b.show_id,
+    show_name: b.show?.title || null,
+    display_order: b.display_order,
+    is_active: b.is_active,
+    starts_at: b.starts_at ? b.starts_at.toISOString().split('T')[0] : null,
+    ends_at: b.ends_at ? b.ends_at.toISOString().split('T')[0] : null,
+    created_at: b.created_at,
+  };
+}
+
+export async function getHeroBanners(req, res, next) {
+  try {
+    const banners = await prisma.heroBanner.findMany({
+      orderBy: [{ display_order: 'asc' }, { created_at: 'asc' }],
+      include: { show: { select: { id: true, title: true, banner_url: true } } },
+    });
+    return res.json(new ApiResponse(200, { banners: banners.map(formatHeroBanner) }, 'Hero banners fetched'));
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function createHeroBanner(req, res, next) {
+  try {
+    const { title, show_id, is_active = true, starts_at, ends_at, display_order } = req.body;
+    if (!title?.trim()) throw new AppError('Title is required', 400);
+    if (!show_id) throw new AppError('A linked show is required', 400);
+
+    const show = await prisma.show.findUnique({
+      where: { id: show_id },
+      select: { id: true, title: true, banner_url: true },
+    });
+    if (!show) throw new AppError('Linked show not found', 404);
+    if (!show.banner_url) throw new AppError('The selected show has no banner image uploaded yet', 400);
+
+    let order = Number.isFinite(Number(display_order)) ? Number(display_order) : null;
+    if (order == null) {
+      const max = await prisma.heroBanner.aggregate({ _max: { display_order: true } });
+      order = (max._max.display_order ?? 0) + 1;
+    }
+
+    const banner = await prisma.heroBanner.create({
+      data: {
+        title: title.trim(),
+        show_id,
+        image_url: show.banner_url,
+        display_order: order,
+        is_active: Boolean(is_active),
+        starts_at: starts_at ? new Date(starts_at) : null,
+        ends_at: ends_at ? new Date(ends_at) : null,
+      },
+      include: { show: { select: { id: true, title: true, banner_url: true } } },
+    });
+
+    return res.status(201).json(new ApiResponse(201, formatHeroBanner(banner), 'Hero banner created'));
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateHeroBanner(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { title, show_id, is_active, starts_at, ends_at, display_order } = req.body;
+
+    const existing = await prisma.heroBanner.findUnique({ where: { id } });
+    if (!existing) throw new AppError('Hero banner not found', 404);
+
+    const data = {};
+    if (title !== undefined) data.title = String(title).trim();
+    if (is_active !== undefined) data.is_active = Boolean(is_active);
+    if (starts_at !== undefined) data.starts_at = starts_at ? new Date(starts_at) : null;
+    if (ends_at !== undefined) data.ends_at = ends_at ? new Date(ends_at) : null;
+    if (display_order !== undefined) data.display_order = Number(display_order);
+
+    if (show_id !== undefined) {
+      const show = await prisma.show.findUnique({
+        where: { id: show_id },
+        select: { id: true, title: true, banner_url: true },
+      });
+      if (!show) throw new AppError('Linked show not found', 404);
+      if (!show.banner_url) throw new AppError('The selected show has no banner image uploaded yet', 400);
+      data.show_id = show_id;
+      data.image_url = show.banner_url;
+    }
+
+    const updated = await prisma.heroBanner.update({
+      where: { id },
+      data,
+      include: { show: { select: { id: true, title: true, banner_url: true } } },
+    });
+
+    return res.json(new ApiResponse(200, formatHeroBanner(updated), 'Hero banner updated'));
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function toggleHeroBanner(req, res, next) {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.heroBanner.findUnique({ where: { id } });
+    if (!existing) throw new AppError('Hero banner not found', 404);
+
+    const updated = await prisma.heroBanner.update({
+      where: { id },
+      data: { is_active: !existing.is_active },
+    });
+
+    return res.json(new ApiResponse(200, { id: updated.id, is_active: updated.is_active }, 'Hero banner toggled'));
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function reorderHeroBanners(req, res, next) {
+  try {
+    const { ordered_ids: orderedIds } = req.body;
+    if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+      throw new AppError('ordered_ids array is required', 400);
+    }
+
+    await prisma.$transaction(
+      orderedIds.map((bannerId, index) =>
+        prisma.heroBanner.update({
+          where: { id: bannerId },
+          data: { display_order: index + 1 },
+        })
+      )
+    );
+
+    const banners = await prisma.heroBanner.findMany({
+      orderBy: [{ display_order: 'asc' }, { created_at: 'asc' }],
+      include: { show: { select: { id: true, title: true, banner_url: true } } },
+    });
+
+    return res.json(new ApiResponse(200, { banners: banners.map(formatHeroBanner) }, 'Hero banners reordered'));
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteHeroBanner(req, res, next) {
+  try {
+    const { id } = req.params;
+    const banner = await prisma.heroBanner.findUnique({ where: { id } });
+    if (!banner) throw new AppError('Hero banner not found', 404);
+
+    await prisma.heroBanner.delete({ where: { id } });
+    return res.json(new ApiResponse(200, {}, 'Hero banner deleted'));
+  } catch (error) {
+    next(error);
+  }
+}
+
 /**
  * Helper function to calculate date range based on period type
  */

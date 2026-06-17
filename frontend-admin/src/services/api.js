@@ -223,6 +223,16 @@ export const mediaApi = {
     api.post('/media/confirm/video', { episode_id: episodeId }),
   confirmImage: (type, entityId, objectName) =>
     api.post('/media/confirm/image', { type, entity_id: entityId, object_name: objectName }),
+  uploadImageFile: (type, entityId, file) => {
+    const formData = new FormData();
+    formData.append('type', type);
+    formData.append('entity_id', entityId);
+    formData.append('image', file);
+
+    return uploadApi.post('/media/upload/image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   // Upload a file directly to MinIO using a presigned PUT URL
   uploadToMinio: (presignedUrl, file) =>
     fetch(presignedUrl, {
@@ -307,4 +317,14 @@ export const bannersApi = {
   update: (id, data) => api.put(`/v1/admin/banners/${id}`, data),
   delete: (id) => api.delete(`/v1/admin/banners/${id}`),
   toggle: (id) => api.patch(`/v1/admin/banners/${id}/toggle`),
+};
+
+// ── Hero Section Banners ──
+export const heroBannersApi = {
+  getAll: () => api.get('/v1/admin/hero-banners'),
+  create: (data) => api.post('/v1/admin/hero-banners', data),
+  update: (id, data) => api.put(`/v1/admin/hero-banners/${id}`, data),
+  delete: (id) => api.delete(`/v1/admin/hero-banners/${id}`),
+  toggle: (id) => api.patch(`/v1/admin/hero-banners/${id}/toggle`),
+  reorder: (orderedIds) => api.put('/v1/admin/hero-banners/reorder', { ordered_ids: orderedIds }),
 };

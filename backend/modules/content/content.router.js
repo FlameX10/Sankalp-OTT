@@ -42,6 +42,7 @@ router.delete('/episodes/:id', requireAuth, requireAdmin('dramas'), ctrl.deleteE
 
 // ── Home (mobile app — public) ──
 router.get('/home/banners', ctrl.getHomeBanners);
+router.get('/home/hero-banners', ctrl.getHomeHeroBanners);
 router.get('/home/announcements', ctrl.getHomeAnnouncements);
 
 export default router;

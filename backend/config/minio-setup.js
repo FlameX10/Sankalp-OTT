@@ -14,6 +14,8 @@ export async function setupMinioBuckets() {
     }
 
     // Public read access for thumbnails, banners (inside dramas/ folder)
+    // HLS files are also readable by nginx from the internal MinIO origin.
+    // External playback remains protected by nginx signed /hls/ URLs.
     const policy = {
       Version: '2012-10-17',
       Statement: [
@@ -24,6 +26,7 @@ export async function setupMinioBuckets() {
           Resource: [
             `arn:aws:s3:::${bucket}/dramas/*/thumbnail.jpg`,
             `arn:aws:s3:::${bucket}/dramas/*/banner.jpg`,
+            `arn:aws:s3:::${bucket}/dramas/*/episodes/*`,
           ],
         },
       ],

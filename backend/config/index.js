@@ -28,6 +28,12 @@ export default {
   // Redis
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
 
+  // HLS direct delivery signing. Must match nginx HLS_SIGNING_SECRET.
+  hls: {
+    signingSecret: process.env.HLS_SIGNING_SECRET || 'ott-dev-hls-signing-secret-change-me',
+    signedUrlTtl: parseInt(process.env.HLS_SIGNED_URL_TTL) || 7200,
+  },
+
   // Meilisearch
   meiliHost: process.env.MEILI_HOST || 'http://localhost:7700',
   meiliKey: process.env.MEILI_MASTER_KEY || '',

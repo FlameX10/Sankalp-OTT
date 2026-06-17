@@ -215,7 +215,11 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
   });
 
   return res.status(201).json(
-    new ApiResponse(201, result.user, result.message)
+    new ApiResponse(201, {
+      user: result.user,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    }, result.message)
   );
 });
 

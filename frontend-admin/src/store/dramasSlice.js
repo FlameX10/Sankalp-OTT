@@ -147,9 +147,7 @@ export const createDrama = createAsyncThunk(
       if (formData.thumbnailFile) {
         try {
           console.log('Uploading thumbnail for show:', show.id)
-          const { data: urlData } = await mediaApi.getImageUploadUrl('thumbnail', show.id)
-          await mediaApi.uploadToMinio(urlData.upload_url, formData.thumbnailFile)
-          await mediaApi.confirmImage('thumbnail', show.id, urlData.object_name)
+          await mediaApi.uploadImageFile('thumbnail', show.id, formData.thumbnailFile)
           console.log('Thumbnail uploaded successfully')
         } catch (thumbErr) {
           console.error('Thumbnail upload failed:', thumbErr)
@@ -159,9 +157,7 @@ export const createDrama = createAsyncThunk(
       if (formData.bannerFile) {
         try {
           console.log('Uploading banner for show:', show.id)
-          const { data: urlData } = await mediaApi.getImageUploadUrl('banner', show.id)
-          await mediaApi.uploadToMinio(urlData.upload_url, formData.bannerFile)
-          await mediaApi.confirmImage('banner', show.id, urlData.object_name)
+          await mediaApi.uploadImageFile('banner', show.id, formData.bannerFile)
           console.log('Banner uploaded successfully')
         } catch (bannerErr) {
           console.error('Banner upload failed:', bannerErr)
@@ -203,9 +199,7 @@ export const updateDrama = createAsyncThunk(
       if (formData.thumbnailFile) {
         try {
           console.log('Uploading thumbnail for show:', id)
-          const { data: urlData } = await mediaApi.getImageUploadUrl('thumbnail', id)
-          await mediaApi.uploadToMinio(urlData.upload_url, formData.thumbnailFile)
-          await mediaApi.confirmImage('thumbnail', id, urlData.object_name)
+          await mediaApi.uploadImageFile('thumbnail', id, formData.thumbnailFile)
           console.log('Thumbnail uploaded successfully')
         } catch (thumbErr) {
           console.error('Thumbnail upload failed:', thumbErr)
@@ -215,9 +209,7 @@ export const updateDrama = createAsyncThunk(
       if (formData.bannerFile) {
         try {
           console.log('Uploading banner for show:', id)
-          const { data: urlData } = await mediaApi.getImageUploadUrl('banner', id)
-          await mediaApi.uploadToMinio(urlData.upload_url, formData.bannerFile)
-          await mediaApi.confirmImage('banner', id, urlData.object_name)
+          await mediaApi.uploadImageFile('banner', id, formData.bannerFile)
           console.log('Banner uploaded successfully')
         } catch (bannerErr) {
           console.error('Banner upload failed:', bannerErr)

@@ -548,14 +548,25 @@ export const verifyOtpAndCreateUser = async (verificationData) => {
     // Clear rate limiting
     await clearResendRateLimit(session.email);
 
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+    const refreshTokenHash = await hashRefreshToken(refreshToken);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken: refreshTokenHash },
+    });
+
     logger.info('User account created after OTP verification', { 
       userId: user.id, 
       email: user.email 
     });
 
     return {
-      user,
-      message: 'Email verified successfully. You can now login.'
+      user: { ...user, membership: null },
+      accessToken,
+      refreshToken,
+      message: 'Email verified successfully. Welcome!',
     };
   } catch (error) {
     logger.error('OTP verification failed', { error: error.message });

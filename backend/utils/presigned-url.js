@@ -1,20 +1,25 @@
-import { minioPublicClient } from '../config/minio.js';
+import { minioClient } from '../config/minio.js';
 import config from '../config/index.js';
 
-// Presigned PUT URL — browser uploads directly to MinIO using this
+const INTERNAL = `http://minio:9000`;
+const PUBLIC = (process.env.MINIO_PUBLIC_HOST || INTERNAL).replace(/\/$/, '');
+
+function toPublic(url) {
+  return url.replace(INTERNAL, PUBLIC);
+}
+
 async function getPresignedPutUrl(objectName, expirySeconds = 900) {
-  return minioPublicClient.presignedPutObject(config.minio.bucket, objectName, expirySeconds);
+  const url = await minioClient.presignedPutObject(config.minio.bucket, objectName, expirySeconds);
+  return toPublic(url);
 }
 
-// Presigned GET URL — browser streams/views protected files using this
 async function getPresignedGetUrl(objectName, expirySeconds = 7200) {
-  return minioPublicClient.presignedGetObject(config.minio.bucket, objectName, expirySeconds);
+  const url = await minioClient.presignedGetObject(config.minio.bucket, objectName, expirySeconds);
+  return toPublic(url);
 }
 
-// Public URL — for thumbnails/banners (open bucket policy, no auth needed)
 function getPublicUrl(objectName) {
-  const publicHost = process.env.MINIO_PUBLIC_HOST || `http://localhost:9000`;
-  return `${publicHost}/${config.minio.bucket}/${objectName}`;
+  return `${PUBLIC}/${config.minio.bucket}/${objectName}`;
 }
 
 export { getPresignedPutUrl, getPresignedGetUrl, getPublicUrl };

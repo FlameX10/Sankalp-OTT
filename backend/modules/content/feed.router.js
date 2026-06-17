@@ -3,40 +3,13 @@ import { prisma } from '../../prisma/client.js';
 import { allowGuest, requireAuth } from '../../middleware/auth.middleware.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { unlockEpisodeForUser } from '../user/episode-unlock.service.js';
+import { checkEpisodeAccess } from '../user/episode-access.service.js';
 import { displayedViewCount } from '../user/view-count.service.js';
+import { getSignedEpisodeHlsPath } from '../../utils/hls-signed-url.js';
 
 const router = express.Router();
 
 // ── Helper: Check if user can access a paid episode ──
-async function checkEpisodeAccess(userId, isGuest, episodeId, isFree) {
-  // Free episodes are always accessible
-  if (isFree) return { is_locked: false, lock_reason: null };
-
-  // Guest users can never access paid episodes
-  if (isGuest || !userId) {
-    return { is_locked: true, lock_reason: 'login_required' };
-  }
-
-  // Check 1: Does the user have an active membership?
-  const membership = await prisma.userMembership.findFirst({
-    where: {
-      user_id: userId,
-      status: 'ACTIVE',
-      end_date: { gte: new Date() },
-    },
-  });
-  if (membership) return { is_locked: false, lock_reason: null };
-
-  // Check 2: Did the user unlock this episode with coins?
-  const coinUnlock = await prisma.episodeAccess.findUnique({
-    where: { idx_ea_user_ep: { user_id: userId, episode_id: episodeId } },
-  });
-  if (coinUnlock) return { is_locked: false, lock_reason: null };
-
-  // User is logged in but has no membership and hasn't unlocked with coins
-  return { is_locked: true, lock_reason: 'coins_or_membership' };
-}
-
 // GET /api/feed/for-you — Episode 1 of shows, ordered by feed_position
 // Uses allowGuest: logged-in users get personalized lock status, guests see locks on paid content
 router.get('/for-you', allowGuest, async (req, res, next) => {
@@ -81,8 +54,8 @@ router.get('/for-you', allowGuest, async (req, res, next) => {
 
       // Only provide HLS URL if episode is unlocked
       let streamUrl = null;
-      if (!is_locked && ep1.hls_master_url) {
-        streamUrl = `/api/media/hls/${show.id}/${ep1.id}/master.m3u8`;
+      if (!is_locked) {
+        streamUrl = getSignedEpisodeHlsPath(ep1);
       }
 
       items.push({
@@ -155,9 +128,7 @@ router.get('/show/:showId', allowGuest, async (req, res, next) => {
         coin_cost: ep.coin_cost,
         duration_sec: ep.duration_sec,
         status: ep.status,
-        hls_url: !is_locked && ep.status === 'ready' && ep.hls_master_url
-          ? `/api/media/hls/${showId}/${ep.id}/master.m3u8`
-          : null,
+        hls_url: !is_locked ? getSignedEpisodeHlsPath(ep) : null,
         is_locked,
         lock_reason,
       };

@@ -186,6 +186,16 @@ worker.on('completed', (job, result) => {
 });
 
 worker.on('failed', (job, err) => {
+  // Cleanup any leftover temp files for this episode on failure
+  // Prevents orphaned GBs in /tmp from failed transcode jobs over time
+  if (job?.data?.episodeId) {
+    const workDir = path.join(TEMP_DIR, job.data.episodeId);
+    if (fs.existsSync(workDir)) {
+      fs.rmSync(workDir, { recursive: true, force: true });
+      console.log(`[Worker] Cleaned up temp files on failure: ${workDir}`);
+    }
+  }
+
   console.error(`[Worker] Job ${job.id} FAILED:`, {
     profile: job.data?.profile,
     episode: job.data?.episodeId,

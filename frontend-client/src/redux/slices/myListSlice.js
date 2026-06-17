@@ -82,6 +82,22 @@ export const fetchWatchHistory = createAsyncThunk(
 );
 
 /**
+ * Remove a watch history entry.
+ */
+export const deleteWatchHistory = createAsyncThunk(
+  'myList/deleteWatchHistory',
+  async ({ historyId }, { getState, rejectWithValue }) => {
+    try {
+      const token = getState().auth?.accessToken;
+      await userApi.delete(`/watch-history/${historyId}`, { headers: authHeader(token) });
+      return { historyId };
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to delete watch history');
+    }
+  }
+);
+
+/**
  * Upsert a watch history entry.
  * Payload: { episodeId, progressSec, showId, showTitle, thumbnailUrl, category, episodeNum, durationSec }
  *
@@ -237,6 +253,13 @@ const myListSlice = createSlice({
         state.watchHistoryLoading = false;
         state.watchHistoryError = action.payload;
       });
+
+    builder.addCase(deleteWatchHistory.fulfilled, (state, action) => {
+      const { historyId } = action.payload;
+      state.watchHistory = state.watchHistory.filter(
+        (h) => h.history_id !== historyId
+      );
+    });
 
     // ── upsertWatchHistory ──────────────────────────────────────
     builder

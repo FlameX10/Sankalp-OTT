@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Pressable,
   Keyboard,
+  Modal,
 } from 'react-native';
 import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,12 +22,21 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import CoinIcon from '../components/CoinIcon';
 import DramaDetailsSheetConnected from '../components/DramaDetailsSheetConnected';
+import HomeHeroSlider from '../components/home/HomeHeroSlider';
+import HomeShowSection from '../components/home/HomeShowSection';
+import { fetchHeroBanners } from '../components/home/homePromoApi';
 import { ROUTES } from '../constants/routes';
 import { theme } from '../constants/theme';
 import { clearPendingHomeBanner } from '../redux/slices/promoFlowSlice';
 import { API_BASE_URL } from '../constants/config';
 import { createAuthenticatedApi } from '../services/api';
-import { initShowPlayer } from '../redux/slices/showPlayerSlice';
+import { initShowPlayer, fetchShowPlayerPage } from '../redux/slices/showPlayerSlice';
+import {
+  fetchBookmarks,
+  fetchWatchHistory,
+  selectBookmarks,
+  selectWatchHistory,
+} from '../redux/slices/myListSlice';
 import {
   clearHomeDramaSheetSession,
   selectHomeDramaSheetSession,
@@ -55,6 +65,19 @@ function formatViews(viewCount) {
   return String(viewCount);
 }
 
+function sameCategoryId(a, b) {
+  return String(a ?? 'all') === String(b ?? 'all');
+}
+
+function showMatchesCategory(show, tab) {
+  if (!tab?.id) return true;
+  const categoryId = String(tab.id);
+  return String(show.category_id) === categoryId
+    || String(show.category?.id) === categoryId
+    || show.category_name === tab.name
+    || show.category === tab.name;
+}
+
 const DramaCard = ({ item, onPress }) => (
   <TouchableOpacity style={styles.cardContainer} onPress={onPress} activeOpacity={0.85}>
     <View style={styles.imageWrapper}>
@@ -69,14 +92,16 @@ const DramaCard = ({ item, onPress }) => (
         </View>
       )}
       <View style={styles.viewCountContainer}>
-        <Ionicons name="play" size={10} color="#fff" />
+        <Ionicons name="eye-outline" size={11} color="#fff" />
         <Text style={styles.viewCountText}>
           {formatViews(item.view_count || item.views)}
         </Text>
       </View>
     </View>
     <Text style={styles.dramaTitle} numberOfLines={2}>{item.title}</Text>
-    <Text style={styles.categoryText}>{item.category_name || item.category}</Text>
+    <Text style={styles.dramaTagsText} numberOfLines={1}>
+      {item.tags?.length > 0 ? item.tags[0] : (item.category_name || item.category || '')}
+    </Text>
   </TouchableOpacity>
 );
 
@@ -109,6 +134,11 @@ export default function PopularScreen() {
   const reopenHomeSheet = useSelector(selectHomeReopenSheetAfterPlayer);
   const [dramaSheetKey, setDramaSheetKey] = useState(0);
   const pendingHomeBanner = useSelector(selectPendingHomeBanner);
+  const bookmarks = useSelector(selectBookmarks);
+  const watchHistory = useSelector(selectWatchHistory);
+  const [heroBanners, setHeroBanners] = useState([]);
+  const [expandedSection, setExpandedSection] = useState(null);
+  const [expandedCategoryTab, setExpandedCategoryTab] = useState(null);
 
   const goToEarnRewards = () => {
     navigation.navigate(ROUTES.PROFILE, {
@@ -176,6 +206,34 @@ export default function PopularScreen() {
     return searchQuery.trim();
   }, [selectedTags, searchQuery]);
 
+  const isSearchActive = Boolean(effectiveSearch);
+  const trendingShows = useMemo(() => {
+    return [...shows]
+      .sort((a, b) => (b.view_count || b.views || 0) - (a.view_count || a.views || 0))
+      .slice(0, 9);
+  }, [shows]);
+  const activeCategory = useMemo(
+    () => tabs.find((tab) => sameCategoryId(tab.id, activeTab)) || tabs[0] || { id: null, name: 'All' },
+    [tabs, activeTab]
+  );
+  const categoryShowsPreview = useMemo(
+    () => shows.filter((show) => showMatchesCategory(show, activeCategory)).slice(0, 12),
+    [shows, activeCategory]
+  );
+
+  const expandedItems = useMemo(() => {
+    if (!expandedSection) return [];
+    if (expandedSection === 'all') {
+      const selectedExpandedTab = tabs.find((tab) => sameCategoryId(tab.id, expandedCategoryTab))
+        || { id: null, name: 'All' };
+      return shows.filter((show) => showMatchesCategory(show, selectedExpandedTab));
+    }
+    if (expandedSection === 'trending') return trendingShows;
+    if (expandedSection === 'continue') return watchHistory;
+    if (expandedSection === 'saved') return bookmarks;
+    return [];
+  }, [expandedSection, shows, tabs, trendingShows, watchHistory, bookmarks, expandedCategoryTab]);
+
   useEffect(() => {
     filterPanelOpenRef.current = filterPanelOpen;
   }, [filterPanelOpen]);
@@ -201,7 +259,7 @@ export default function PopularScreen() {
 
   const handleSearchFocus = useCallback(() => {
     setSearchInputFocused(true);
-    setFilterPanelOpen(false);
+    setFilterPanelOpen(true);
   }, []);
 
   const handleSearchBlur = useCallback(() => {
@@ -237,7 +295,6 @@ export default function PopularScreen() {
     try {
       const params = new URLSearchParams();
       params.set('status', 'Published');
-      if (activeTab) params.set('category_id', activeTab);
       params.set('page', '1');
       params.set('limit', '60');
       if (effectiveSearch) params.set('search', effectiveSearch);
@@ -252,7 +309,7 @@ export default function PopularScreen() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, effectiveSearch]);
+  }, [effectiveSearch]);
 
   useEffect(() => {
     loadShows();
@@ -261,7 +318,14 @@ export default function PopularScreen() {
   useFocusEffect(
     useCallback(() => {
       loadShows();
-    }, [loadShows])
+      fetchHeroBanners(10)
+        .then(setHeroBanners)
+        .catch(() => setHeroBanners([]));
+      if (accessToken) {
+        dispatch(fetchBookmarks());
+        dispatch(fetchWatchHistory());
+      }
+    }, [loadShows, accessToken, dispatch])
   );
 
   // Re-open drama sheet after returning from ShowPlayer (back, gesture, title, episodes)
@@ -305,8 +369,7 @@ export default function PopularScreen() {
     (item, initialTab = 'synopsis', options = {}) => {
       if (options.fromRelated && selected) {
         setSheetHistory((history) => [
-          ...history,
-          { item: selected, initialTab: sheetInitialTab },
+          history[0] || { item: selected, initialTab: sheetInitialTab },
         ]);
       } else {
         setSheetHistory([]);
@@ -401,10 +464,85 @@ export default function PopularScreen() {
     navigation.navigate(ROUTES.SHOW_PLAYER, { fromHome: true });
   };
 
+  const handleStartWatching = useCallback(() => {
+    if (!selected) return;
+    const episodes = showDetails?.show_id === selected.show_id
+      ? showDetails.episodes
+      : null;
+    const episode = episodes?.find((ep) => ep.status === 'ready' && !ep.is_locked)
+      || episodes?.[0];
+    if (episode && showDetails) {
+      handleEpisodePress(episode);
+      return;
+    }
+    dispatch(
+      initShowPlayer({
+        showId: selected.show_id,
+        showTitle: selected.show_title || selected.title,
+        thumbnailUrl: selected.thumbnail_url,
+        totalEpisodes: selected.total_episodes || 0,
+        seedEpisodes: [],
+        startEpisodeNum: 1,
+        streamBase: API_BASE_URL,
+      })
+    );
+    setSheetVisible(false);
+    navigation.navigate(ROUTES.SHOW_PLAYER, { fromHome: true });
+  }, [selected, showDetails, dispatch, navigation]);
+
+  const handleBannerPress = useCallback((banner) => {
+    if (!banner?.show_id) return;
+    openDetails({
+      id: banner.show_id,
+      title: banner.show_title || banner.title,
+      thumbnail_url: banner.show_thumbnail_url || banner.image_url,
+      synopsis: banner.show_synopsis,
+    });
+  }, [openDetails]);
+
+  const openMyListEntry = useCallback((entry) => {
+    dispatch(
+      initShowPlayer({
+        showId: entry.show_id,
+        showTitle: entry.show_title,
+        thumbnailUrl: entry.thumbnail_url,
+        totalEpisodes: entry.total_episodes || 1,
+        seedEpisodes: [{
+          episode_id: entry.episode_id,
+          episode_num: entry.episode_num,
+          hls_url: null,
+          duration_sec: entry.duration_sec || 0,
+          title: null,
+          is_locked: false,
+          lock_reason: null,
+          is_free: true,
+          coin_cost: 0,
+          status: 'ready',
+        }],
+        startEpisodeNum: entry.episode_num,
+        streamBase: API_BASE_URL,
+        startProgressSec: entry.progress_sec || 0,
+      })
+    );
+    dispatch(
+      fetchShowPlayerPage({
+        showId: entry.show_id,
+        fromEp: Math.max(1, Math.floor((entry.episode_num - 1) / 30) * 30 + 1),
+        limit: 30,
+      })
+    );
+    navigation.navigate(ROUTES.SHOW_PLAYER, { fromHome: true });
+  }, [dispatch, navigation]);
+
+  const openExpandedAll = useCallback(() => {
+    setExpandedCategoryTab(activeTab);
+    setExpandedSection('all');
+  }, [activeTab]);
+
   const handleCloseSheet = () => {
     if (sheetHistory.length > 0) {
-      const previous = sheetHistory[sheetHistory.length - 1];
-      setSheetHistory((history) => history.slice(0, -1));
+      const previous = sheetHistory[0];
+      setSheetHistory([]);
       setDramaSheetKey((k) => k + 1);
       setSelected(previous.item);
       setSheetInitialTab(previous.initialTab || 'synopsis');
@@ -507,7 +645,7 @@ export default function PopularScreen() {
                       const isThirdColumn = (index + 1) % 3 === 0;
                       return (
                         <TouchableOpacity
-                          key={tag.id}
+                          key={`${tag.id || tag.name || 'tag'}-${index}`}
                           style={[
                             styles.tagSearchItem,
                             isThirdColumn && styles.tagSearchItemLastInRow,
@@ -564,36 +702,184 @@ export default function PopularScreen() {
         </Pressable>
       )}
 
-      <View style={styles.tabContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
-          {tabs.map((tab) => (
-            <TouchableOpacity key={tab.id ?? 'all'} onPress={() => setActiveTab(tab.id)}>
-              <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>
-                {tab.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
       {loading && shows.length === 0 ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#FF2D55" />
         </View>
-      ) : (
+      ) : isSearchActive ? (
         <FlatList
           data={shows}
           renderItem={({ item }) => <DramaCard item={item} onPress={() => openDetails(item)} />}
-          keyExtractor={item => item.id.toString()}
+          keyExtractor={(item, index) => `${item.id || item.show_id || 'show'}-${index}`}
           numColumns={3}
           contentContainerStyle={styles.listContent}
           columnWrapperStyle={styles.columnWrapper}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No dramas found in this category.</Text>
+            <Text style={styles.emptyText}>No dramas found.</Text>
           }
         />
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.homeScrollContent}
+        >
+          <HomeHeroSlider banners={heroBanners} onBannerPress={handleBannerPress} />
+
+          <HomeShowSection
+            title="All"
+            items={categoryShowsPreview}
+            onItemPress={(item) => openDetails(item)}
+            onExpand={openExpandedAll}
+            categoryTabs={tabs}
+            activeCategoryId={activeTab}
+            onCategoryPress={(tab) => setActiveTab(tab.id)}
+            emptyText="No dramas found."
+          />
+
+          <HomeShowSection
+            title="Trending"
+            items={trendingShows}
+            onItemPress={(item) => openDetails(item)}
+            onExpand={() => setExpandedSection('trending')}
+          />
+
+          {accessToken && watchHistory.length > 0 ? (
+            <HomeShowSection
+              title="Continue Watching"
+              items={watchHistory.map((entry) => {
+                const showDetails = shows.find(s => s.id === entry.show_id || s.show_id === entry.show_id);
+                return {
+                  id: entry.history_id,
+                  title: entry.show_title,
+                  thumbnail_url: entry.thumbnail_url,
+                  category: entry.category,
+                  tags: showDetails?.tags || entry.tags || [],
+                  progress_sec: entry.progress_sec,
+                  duration_sec: entry.duration_sec,
+                  view_count: 0,
+                  _entry: entry,
+                };
+              })}
+              onItemPress={(item) => openMyListEntry(item._entry)}
+              onExpand={() => setExpandedSection('continue')}
+            />
+          ) : null}
+
+          {accessToken && bookmarks.length > 0 ? (
+            <HomeShowSection
+              title="Saved"
+              items={bookmarks.map((entry) => {
+                const showDetails = shows.find(s => s.id === entry.show_id || s.show_id === entry.show_id);
+                return {
+                  id: entry.bookmark_id,
+                  title: entry.show_title,
+                  thumbnail_url: entry.thumbnail_url,
+                  category: entry.category,
+                  tags: showDetails?.tags || entry.tags || [],
+                  progress_sec: entry.progress_sec,
+                  duration_sec: entry.duration_sec,
+                  view_count: 0,
+                  _entry: entry,
+                };
+              })}
+              onItemPress={(item) => openMyListEntry(item._entry)}
+              onExpand={() => setExpandedSection('saved')}
+            />
+          ) : null}
+        </ScrollView>
       )}
+
+      <Modal
+        visible={Boolean(expandedSection)}
+        animationType="slide"
+        onRequestClose={() => {
+          setExpandedSection(null);
+          setExpandedCategoryTab(null);
+        }}
+      >
+        <View style={[styles.expandModal, { paddingTop: insets.top }]}>
+          <View style={styles.expandHeader}>
+            <Text style={styles.expandTitle}>
+              {expandedSection === 'all' && 'All Dramas'}
+              {expandedSection === 'trending' && 'Trending'}
+              {expandedSection === 'continue' && 'Continue Watching'}
+              {expandedSection === 'saved' && 'Saved'}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setExpandedSection(null);
+                setExpandedCategoryTab(null);
+              }}
+              hitSlop={10}
+            >
+              <Ionicons name="close" size={26} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {expandedSection === 'all' && tabs.length > 0 ? (
+            <View style={styles.expandTabContainer}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.tabScrollContent}
+              >
+                {tabs.map((tab) => (
+                  <TouchableOpacity
+                    key={`${tab.id ?? 'all'}-${tab.name}`}
+                    onPress={() => setExpandedCategoryTab(tab.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.tabText,
+                        sameCategoryId(expandedCategoryTab, tab.id) && styles.activeTabText,
+                      ]}
+                    >
+                      {tab.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
+
+          <FlatList
+            data={expandedItems}
+            keyExtractor={(item, index) => `${item.id || item.show_id || item.history_id || item.bookmark_id || 'expanded'}-${index}`}
+            numColumns={3}
+            contentContainerStyle={styles.listContent}
+            columnWrapperStyle={styles.columnWrapper}
+            renderItem={({ item }) => {
+              if (expandedSection === 'continue' || expandedSection === 'saved') {
+                const entry = item._entry || item;
+                return (
+                  <DramaCard
+                    item={{
+                      id: entry.show_id,
+                      title: entry.show_title,
+                      thumbnail_url: entry.thumbnail_url,
+                      category: entry.category,
+                    }}
+                    onPress={() => {
+                      setExpandedSection(null);
+                      openMyListEntry(entry);
+                    }}
+                  />
+                );
+              }
+              return (
+                <DramaCard
+                  item={item}
+                  onPress={() => {
+                    setExpandedSection(null);
+                    openDetails(item);
+                  }}
+                />
+              );
+            }}
+          />
+        </View>
+      </Modal>
 
       <DramaDetailsSheetConnected
         key={`drama-${dramaSheetKey}-${selected?.show_id ?? 'none'}`}
@@ -606,6 +892,7 @@ export default function PopularScreen() {
         onRangeChange={handleRangeChange}
         onEpisodePress={handleEpisodePress}
         onRelatedPress={handleRelatedPress}
+        onStartWatching={handleStartWatching}
         onClose={handleCloseSheet}
       />
     </View>
@@ -765,10 +1052,36 @@ const styles = StyleSheet.create({
   posterImage: { width: '100%', height: '100%' },
   statusTag: { position: 'absolute', top: 0, right: 0, paddingHorizontal: 6, paddingVertical: 2, borderBottomLeftRadius: 4 },
   tagText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
-  viewCountContainer: { position: 'absolute', bottom: 5, right: 5, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  viewCountContainer: {
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
   viewCountText: { color: '#fff', fontSize: 10, fontWeight: '600' },
   dramaTitle: { color: '#FFF', fontSize: 13, marginTop: 8, fontWeight: '500', lineHeight: 18 },
+  dramaTagsText: { color: '#E0E0E0', fontSize: 11, marginTop: 4, fontWeight: '400' },
   categoryText: { color: '#666', fontSize: 11, marginTop: 4 },
+  homeScrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
+  expandModal: { flex: 1, backgroundColor: '#000' },
+  expandHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  expandTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  expandTabContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
   loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyText: { color: '#666', textAlign: 'center', marginTop: 50, fontSize: 16 },
   

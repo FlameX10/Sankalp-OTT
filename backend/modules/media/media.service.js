@@ -1,7 +1,9 @@
 import fs from 'fs';
 import { prisma } from '../../prisma/client.js';
 import { createTranscodeJobs } from '../../producer.js';
-import { getPresignedPutUrl, getPresignedGetUrl, getPublicUrl } from '../../utils/presigned-url.js';
+import { getPresignedPutUrl, getPublicUrl } from '../../utils/presigned-url.js';
+import { getSignedEpisodeHlsPath } from '../../utils/hls-signed-url.js';
+import { checkEpisodeAccess } from '../user/episode-access.service.js';
 import { AppError } from '../../middleware/error.middleware.js';
 import minioClient from '../../config/minio.js';
 import config from '../../config/index.js';
@@ -61,18 +63,55 @@ async function uploadVideoFile(showId, episodeId, file) {
 
 // Get presigned PUT URL for uploading thumbnail/banner
 async function getImageUploadUrl(type, entityId) {
-  const ext = 'jpg';
-  let objectName;
-
-  if (type === 'thumbnail') objectName = `dramas/${entityId}/thumbnail.${ext}`;
-  else if (type === 'banner') objectName = `dramas/${entityId}/banner.${ext}`;
-  else if (type === 'collection') objectName = `collections/${entityId}/cover.${ext}`;
-  else throw new AppError('Invalid upload type', 400);
+  const objectName = getImageObjectName(type, entityId);
 
   const uploadUrl = await getPresignedPutUrl(objectName, 900);
   const publicUrl = getPublicUrl(objectName);
 
   return { upload_url: uploadUrl, public_url: publicUrl, object_name: objectName };
+}
+
+function getImageObjectName(type, entityId) {
+  const ext = 'jpg';
+
+  if (type === 'thumbnail') return `dramas/${entityId}/thumbnail.${ext}`;
+  if (type === 'banner') return `dramas/${entityId}/banner.${ext}`;
+  if (type === 'collection') return `collections/${entityId}/cover.${ext}`;
+
+  throw new AppError('Invalid upload type', 400);
+}
+
+async function uploadImageFile(type, entityId, file) {
+  if (!file) throw new AppError('No image file provided', 400);
+
+  if (type === 'thumbnail' || type === 'banner') {
+    const show = await prisma.show.findUnique({ where: { id: entityId } });
+    if (!show) throw new AppError('Show not found', 404);
+  }
+
+  const objectName = getImageObjectName(type, entityId);
+  const metaData = {
+    'Content-Type': file.mimetype || 'image/jpeg'
+  };
+
+  try {
+    await minioClient.fPutObject(config.minio.bucket, objectName, file.path, metaData);
+
+    const updated = await confirmImageUpload(type, entityId, objectName);
+    const publicUrl = getPublicUrl(objectName);
+
+    fs.unlink(file.path, (err) => {
+      if (err) console.error('Failed to delete temp image file:', err);
+    });
+
+    console.log(`Image uploaded to MinIO: ${objectName}, size: ${file.size} bytes`);
+    return { type, entity_id: entityId, object_name: objectName, public_url: publicUrl, updated };
+  } catch (err) {
+    fs.unlink(file.path, (deleteErr) => {
+      if (deleteErr) console.error('Failed to delete temp image file after error:', deleteErr);
+    });
+    throw new AppError(`Image upload failed: ${err.message}`, 500);
+  }
 }
 
 // Called after video upload completes — enqueues transcode jobs
@@ -115,18 +154,19 @@ async function confirmImageUpload(type, entityId, objectName) {
 }
 
 // Get presigned streaming URL for an episode
-async function getPlayUrl(episodeId) {
+async function getPlayUrl(episodeId, { userId = null, isGuest = false } = {}) {
   const episode = await prisma.episode.findUnique({ where: { id: episodeId } });
   if (!episode) throw new AppError('Episode not found', 404);
   if (!episode.hls_master_url) throw new AppError('Video not available yet', 404);
   if (episode.status !== 'ready') throw new AppError(`Video is ${episode.status}`, 400);
 
-  // For HLS, we need to serve the master.m3u8 and make segments accessible
-  // Generate presigned URL for master playlist
-  const masterUrl = await getPresignedGetUrl(episode.hls_master_url, 7200);
+  const access = await checkEpisodeAccess(userId, isGuest, episode.id, episode.is_free);
+  if (access.is_locked) {
+    throw new AppError('Episode is locked', 403);
+  }
 
   return {
-    stream_url: masterUrl,
+    stream_url: getSignedEpisodeHlsPath(episode),
     duration_sec: episode.duration_sec,
     episode_id: episode.id,
     episode_num: episode.episode_num,
@@ -165,6 +205,7 @@ export {
   getVideoUploadUrl,
   uploadVideoFile,
   getImageUploadUrl,
+  uploadImageFile,
   confirmVideoUpload,
   confirmImageUpload,
   getPlayUrl,

@@ -44,6 +44,14 @@ const NAV_ICONS = {
       <rect x="3" y="7.5" width="4" height="1" rx=".5" fill="currentColor" opacity=".4"/>
     </>
   ),
+  hero_banners: (
+    <>
+      <rect x="0" y="2" width="16" height="9" rx="1.5" fill="currentColor" opacity=".35"/>
+      <rect x="2" y="4" width="7" height="1.5" rx=".75" fill="currentColor" opacity=".8"/>
+      <rect x="2" y="6.5" width="5" height="1" rx=".5" fill="currentColor" opacity=".5"/>
+      <circle cx="13" cy="6.5" r="1.5" fill="currentColor" opacity=".6"/>
+    </>
+  ),
   membership: (
     <>
       <rect x="1" y="4" width="14" height="9" rx="1.5" fill="currentColor" opacity=".3"/>

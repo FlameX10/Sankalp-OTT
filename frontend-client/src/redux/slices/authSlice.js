@@ -135,8 +135,18 @@ export const verifyOtp = createAsyncThunk(
 
       await authService.clearPendingRegistration();
 
+      const data = response.data?.data || {};
+      const { accessToken, refreshToken, user } = data;
+
+      if (accessToken && refreshToken) {
+        await authService.saveTokens(accessToken, refreshToken);
+        if (user) await authService.saveUserData(user);
+      }
+
       return {
-        user: response.data?.data || null,
+        user: user || null,
+        accessToken: accessToken || null,
+        refreshToken: refreshToken || null,
         message: response.data?.message || 'Email verified successfully',
       };
     } catch (err) {
@@ -466,6 +476,18 @@ const authSlice = createSlice({
         state.otp.isLoading = false;
         state.otp.data = action.payload;
         state.pendingRegistration = null;
+        if (action.payload.accessToken && action.payload.user) {
+          state.accessToken = action.payload.accessToken;
+          state.userId = action.payload.user.id ?? null;
+          state.name = action.payload.user.name;
+          state.email = action.payload.user.email;
+          state.role = action.payload.user.role;
+          state.plan = action.payload.user.plan;
+          state.coins = action.payload.user.coins;
+          state.membership = action.payload.user.membership ?? null;
+          state.status = 'succeeded';
+          state.isLoading = false;
+        }
       })
       .addCase(verifyOtp.rejected, (state, action) => {
         state.otp.status = 'failed';

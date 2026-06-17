@@ -19,6 +19,7 @@ const upload = multer({
 
 // Admin uploads (dramas section)
 router.post('/upload/video', requireAuth, requireAdmin('dramas'), upload.single('video'), ctrl.uploadVideo);
+router.post('/upload/image', requireAuth, requireAdmin('dramas'), upload.single('image'), ctrl.uploadImage);
 router.post('/upload-url/video', requireAuth, requireAdmin('dramas'), ctrl.getVideoUploadUrl);
 router.post('/upload-url/image', requireAuth, requireAdmin('dramas'), ctrl.getImageUploadUrl);
 router.post('/confirm/video', requireAuth, requireAdmin('dramas'), ctrl.confirmVideoUpload);

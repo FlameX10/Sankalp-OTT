@@ -87,7 +87,18 @@ async function deleteEpisode(req, res, next) {
 // ── Home promotions (mobile) ──
 async function getHomeBanners(req, res, next) {
   try {
-    const banners = await service.getActiveHomeBanners(3);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 3, 1), 10);
+    const banners = await service.getActiveHomeBanners(limit);
+    res.json({ banners });
+  } catch (e) {
+    next(e);
+  }
+}
+
+async function getHomeHeroBanners(req, res, next) {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 20);
+    const banners = await service.getActiveHeroBanners(limit);
     res.json({ banners });
   } catch (e) {
     next(e);
@@ -108,5 +119,5 @@ export {
   getTags, createTag, updateTag, deleteTag,
   getShows, getShow, getRelatedShows, createShow, updateShow, deleteShow, togglePublish, updateFeedPosition,
   getEpisodes, createEpisode, updateEpisode, deleteEpisode,
-  getHomeBanners, getHomeAnnouncements,
+  getHomeBanners, getHomeHeroBanners, getHomeAnnouncements,
 };

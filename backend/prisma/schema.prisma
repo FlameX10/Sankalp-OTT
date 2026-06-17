@@ -148,6 +148,7 @@ model UserMembership {
   payment PaymentTransaction? @relation(fields: [payment_id], references: [id])
 
   @@index([user_id, status, end_date], name: "idx_um_user_status")
+  @@index([plan_id, status], name: "idx_um_plan_status")
   @@map("user_memberships")
 }
 
@@ -168,6 +169,8 @@ model PaymentTransaction {
   memberships UserMembership[]
   coin_topups CoinTransaction[]
 
+  @@index([status, type, created_at(sort: Desc)], name: "idx_pt_status_type_created")
+  @@index([user_id, status, created_at(sort: Desc)], name: "idx_pt_user_status_created")
   @@map("payment_transactions")
 }
 
@@ -312,6 +315,7 @@ model EpisodeAccess {
   episode Episode @relation(fields: [episode_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, episode_id], name: "idx_ea_user_ep")
+  @@index([episode_id], name: "idx_ea_episode_id")
   @@map("episode_access")
 }
 
@@ -357,6 +361,7 @@ model CoinTransaction {
   payment_transaction PaymentTransaction?  @relation(fields: [payment_id], references: [id])
 
   @@index([user_id, created_at(sort: Desc)], name: "idx_ct_user_created")
+  @@index([reason, created_at(sort: Desc)], name: "idx_ct_reason_created")
   @@map("coin_transactions")
 }
 
@@ -457,6 +462,7 @@ model Bookmark {
   episode Episode? @relation(fields: [episode_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, show_id], name: "idx_bm_user_show")
+  @@index([user_id, created_at(sort: Desc)], name: "idx_bm_user_created")
   @@map("bookmarks")
 }
 
@@ -522,6 +528,7 @@ model NotificationLog {
 
   user User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
 
+  @@index([user_id, sent_at(sort: Desc)], name: "idx_nl_user_sent")
   @@map("notification_log")
 }
 
@@ -540,6 +547,7 @@ model AdminActivityLog {
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
+  @@index([created_at(sort: Desc)], name: "idx_aal_created")
   @@map("admin_activity_log")
 }
 

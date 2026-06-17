@@ -99,13 +99,9 @@ const DramaCard = ({ item, onPress }) => (
       </View>
     </View>
     <Text style={styles.dramaTitle} numberOfLines={2}>{item.title}</Text>
-    {item.tags?.length > 0 ? (
-      <Text style={styles.dramaTagsText} numberOfLines={1}>
-        {item.tags.join(' · ')}
-      </Text>
-    ) : (
-      <Text style={styles.categoryText}>{item.category_name || item.category}</Text>
-    )}
+    <Text style={styles.dramaTagsText} numberOfLines={1}>
+      {item.tags?.length > 0 ? item.tags[0] : (item.category_name || item.category || '')}
+    </Text>
   </TouchableOpacity>
 );
 
@@ -211,7 +207,11 @@ export default function PopularScreen() {
   }, [selectedTags, searchQuery]);
 
   const isSearchActive = Boolean(effectiveSearch);
-  const trendingShows = useMemo(() => shows.slice(0, 5), [shows]);
+  const trendingShows = useMemo(() => {
+    return [...shows]
+      .sort((a, b) => (b.view_count || b.views || 0) - (a.view_count || a.views || 0))
+      .slice(0, 9);
+  }, [shows]);
   const activeCategory = useMemo(
     () => tabs.find((tab) => sameCategoryId(tab.id, activeTab)) || tabs[0] || { id: null, name: 'All' },
     [tabs, activeTab]
@@ -747,14 +747,20 @@ export default function PopularScreen() {
           {accessToken && watchHistory.length > 0 ? (
             <HomeShowSection
               title="Continue Watching"
-              items={watchHistory.map((entry) => ({
-                id: entry.history_id,
-                title: entry.show_title,
-                thumbnail_url: entry.thumbnail_url,
-                category: entry.category,
-                view_count: 0,
-                _entry: entry,
-              }))}
+              items={watchHistory.map((entry) => {
+                const showDetails = shows.find(s => s.id === entry.show_id || s.show_id === entry.show_id);
+                return {
+                  id: entry.history_id,
+                  title: entry.show_title,
+                  thumbnail_url: entry.thumbnail_url,
+                  category: entry.category,
+                  tags: showDetails?.tags || entry.tags || [],
+                  progress_sec: entry.progress_sec,
+                  duration_sec: entry.duration_sec,
+                  view_count: 0,
+                  _entry: entry,
+                };
+              })}
               onItemPress={(item) => openMyListEntry(item._entry)}
               onExpand={() => setExpandedSection('continue')}
             />
@@ -763,14 +769,20 @@ export default function PopularScreen() {
           {accessToken && bookmarks.length > 0 ? (
             <HomeShowSection
               title="Saved"
-              items={bookmarks.map((entry) => ({
-                id: entry.bookmark_id,
-                title: entry.show_title,
-                thumbnail_url: entry.thumbnail_url,
-                category: entry.category,
-                view_count: 0,
-                _entry: entry,
-              }))}
+              items={bookmarks.map((entry) => {
+                const showDetails = shows.find(s => s.id === entry.show_id || s.show_id === entry.show_id);
+                return {
+                  id: entry.bookmark_id,
+                  title: entry.show_title,
+                  thumbnail_url: entry.thumbnail_url,
+                  category: entry.category,
+                  tags: showDetails?.tags || entry.tags || [],
+                  progress_sec: entry.progress_sec,
+                  duration_sec: entry.duration_sec,
+                  view_count: 0,
+                  _entry: entry,
+                };
+              })}
               onItemPress={(item) => openMyListEntry(item._entry)}
               onExpand={() => setExpandedSection('saved')}
             />
@@ -1054,7 +1066,7 @@ const styles = StyleSheet.create({
   },
   viewCountText: { color: '#fff', fontSize: 10, fontWeight: '600' },
   dramaTitle: { color: '#FFF', fontSize: 13, marginTop: 8, fontWeight: '500', lineHeight: 18 },
-  dramaTagsText: { color: '#FFF', fontSize: 11, marginTop: 4, fontWeight: '800' },
+  dramaTagsText: { color: '#E0E0E0', fontSize: 11, marginTop: 4, fontWeight: '400' },
   categoryText: { color: '#666', fontSize: 11, marginTop: 4 },
   homeScrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
   expandModal: { flex: 1, backgroundColor: '#000' },

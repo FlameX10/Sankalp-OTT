@@ -99,9 +99,9 @@ export default function ProgressBar({
         }}
         {...panResponder.panHandlers}
       >
-        <View style={styles.progressBarTrack}>
+        <View style={[styles.progressBarTrack, scrubbing && styles.progressBarTrackScrubbing]}>
           <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
-          <View style={[styles.scrubberDot, { left: `${progress * 100}%` }]} />
+          <View style={[styles.scrubberDot, scrubbing && styles.scrubberDotScrubbing, { left: `${progress * 100}%` }]} />
         </View>
       </View>
 

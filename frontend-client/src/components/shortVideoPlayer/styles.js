@@ -83,10 +83,14 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   progressBarTrack: {
-    height: 4,
+    height: 2,
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 2,
     position: 'relative',
+  },
+  progressBarTrackScrubbing: {
+    height: 6,
+    borderRadius: 3,
   },
   progressBarFill: {
     height: '100%',
@@ -95,12 +99,19 @@ export const styles = StyleSheet.create({
   },
   scrubberDot: {
     position: 'absolute',
-    top: -4,
+    top: -5,
     width: 12,
     height: 12,
     borderRadius: 6,
     backgroundColor: shortVideoTheme.crimson,
     marginLeft: -6,
+  },
+  scrubberDotScrubbing: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginLeft: -8,
+    top: -5,
   },
   timeRow: {
     flexDirection: 'row',

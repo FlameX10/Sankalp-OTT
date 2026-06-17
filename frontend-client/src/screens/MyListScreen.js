@@ -5,6 +5,7 @@ import {
   Dimensions,
   FlatList,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -88,7 +89,7 @@ const pStyles = StyleSheet.create({
 // Show card — matches the UI reference image exactly
 // thumbnail on left, title + category + EP.X / EP.TOTAL on right
 // ─────────────────────────────────────────────────────────────────
-function ShowCard({ item, onPress, onDelete }) {
+function ShowCard({ item, onPress, onLongPress, selectionMode, selected }) {
   const progressPct =
     item.duration_sec > 0
       ? Math.min(Math.round((item.progress_sec / item.duration_sec) * 100), 100)
@@ -100,20 +101,11 @@ function ShowCard({ item, onPress, onDelete }) {
     <Pressable
       style={({ pressed }) => [
         cardStyles.card,
-        pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+        pressed && !selectionMode && { opacity: 0.85, transform: [{ scale: 0.98 }] },
       ]}
       onPress={onPress}
+      onLongPress={onLongPress}
     >
-      {onDelete ? (
-        <TouchableOpacity
-          style={cardStyles.deleteBtn}
-          onPress={onDelete}
-          hitSlop={8}
-        >
-          <Ionicons name="trash-outline" size={16} color={theme.white} />
-        </TouchableOpacity>
-      ) : null}
-
       {/* Thumbnail */}
       <View style={cardStyles.thumbnailWrap}>
         {resolvedThumbnailUrl ? (
@@ -126,9 +118,13 @@ function ShowCard({ item, onPress, onDelete }) {
           <View style={[cardStyles.thumbnail, { backgroundColor: theme.surface }]} />
         )}
 
-        {/* Play icon overlay */}
+        {/* Play icon overlay / Selection overlay */}
         <View style={cardStyles.playOverlay}>
-          <Ionicons name="play" size={18} color={theme.white} />
+          {selectionMode ? (
+            <Ionicons name={selected ? "checkmark-circle" : "ellipse-outline"} size={24} color={selected ? theme.crimson : theme.white} />
+          ) : (
+            <Ionicons name="play" size={18} color={theme.white} />
+          )}
         </View>
 
         {/* Progress bar at bottom of thumbnail */}
@@ -142,7 +138,7 @@ function ShowCard({ item, onPress, onDelete }) {
       <View style={cardStyles.info}>
         {/* Category / tags */}
         <Text style={cardStyles.category} numberOfLines={1}>
-          {item.category || 'Drama'}
+          {item.tags?.length > 0 ? item.tags[0] : (item.category || 'Drama')}
         </Text>
 
         {/* Title */}
@@ -211,9 +207,9 @@ const cardStyles = StyleSheet.create({
     gap: 4,
   },
   category: {
-    color: theme.gray,
+    color: '#E0E0E0',
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '400',
   },
   title: {
     color: theme.white,
@@ -290,6 +286,9 @@ export default function MyListScreen() {
   const watchHistoryLoaded = useSelector(selectWatchHistoryLoaded);
 
   const [activeTab, setActiveTab] = useState(TAB_SAVED);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedItems, setSelectedItems] = useState(new Set());
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
   // Fetch data on mount if authenticated and not yet loaded
   useEffect(() => {
@@ -353,45 +352,57 @@ export default function MyListScreen() {
     navigation.navigate(ROUTES.SHOW_PLAYER, { fromMyList: true });
   }, [dispatch, navigation]);
 
-  // ── Remove bookmark ──────────────────────────────────────────
-  const handleRemoveBookmark = useCallback((bookmark) => {
-    Alert.alert(
-      'Remove from Saved',
-      'Are you sure you want to remove this drama from your saved list?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            dispatch(toggleBookmark({
-              showId: bookmark.show_id,
-              episodeId: bookmark.episode_id,
-              progressSec: bookmark.progress_sec || 0,
-            }));
-          },
-        },
-      ]
-    );
-  }, [dispatch]);
+  const handleCardPressAction = useCallback((entry) => {
+    const id = activeTab === TAB_SAVED ? entry.bookmark_id : entry.history_id;
+    if (selectionMode) {
+      setSelectedItems((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) {
+          next.delete(id);
+          if (next.size === 0) setSelectionMode(false);
+        } else {
+          next.add(id);
+        }
+        return next;
+      });
+    } else {
+      handleCardPress(entry);
+    }
+  }, [selectionMode, activeTab, handleCardPress]);
 
-  const handleRemoveWatchHistory = useCallback((entry) => {
-    if (!entry.history_id) return;
-    Alert.alert(
-      'Remove from Continue Watching',
-      'Are you sure you want to delete this from your watch history?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            dispatch(deleteWatchHistory({ historyId: entry.history_id }));
-          },
-        },
-      ]
-    );
-  }, [dispatch]);
+  const handleCardLongPress = useCallback((entry) => {
+    if (!selectionMode) {
+      setSelectionMode(true);
+      const id = activeTab === TAB_SAVED ? entry.bookmark_id : entry.history_id;
+      setSelectedItems(new Set([id]));
+    }
+  }, [selectionMode, activeTab]);
+
+  const cancelSelection = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedItems(new Set());
+  }, []);
+
+  const confirmDeleteSelected = useCallback(() => {
+    if (activeTab === TAB_SAVED) {
+      selectedItems.forEach(id => {
+        const item = bookmarks.find(b => b.bookmark_id === id);
+        if (item) {
+          dispatch(toggleBookmark({
+            showId: item.show_id,
+            episodeId: item.episode_id,
+            progressSec: item.progress_sec || 0,
+          }));
+        }
+      });
+    } else {
+      selectedItems.forEach(id => {
+        dispatch(deleteWatchHistory({ historyId: id }));
+      });
+    }
+    setDeleteModalVisible(false);
+    cancelSelection();
+  }, [selectedItems, activeTab, bookmarks, dispatch, cancelSelection]);
 
   // ── Merge bookmark with latest watch history ──────────────────
   // If a show was bookmarked but the user watched a later episode,
@@ -411,6 +422,8 @@ export default function MyListScreen() {
         duration_sec: watchEntry.duration_sec,
         progress_sec: watchEntry.progress_sec,
         total_episodes: watchEntry.total_episodes ?? bookmark.total_episodes,
+        bookmark_id: bookmark.bookmark_id,
+        tags: bookmark.tags,
       };
     }
 
@@ -434,19 +447,36 @@ export default function MyListScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       {/* ── Header ── */}
-      <View style={styles.header}>
-        <Text style={styles.title}>My List</Text>
-        <View style={styles.countBadge}>
-          <Text style={styles.countText}>{totalCount} Videos</Text>
+      {selectionMode ? (
+        <View style={styles.selectionHeader}>
+          <TouchableOpacity onPress={cancelSelection} style={styles.cancelBtn}>
+            <Text style={styles.cancelBtnText}>Cancel</Text>
+          </TouchableOpacity>
+          <Text style={styles.selectionTitle}>{selectedItems.size} Selected</Text>
+          <TouchableOpacity onPress={() => setDeleteModalVisible(true)} style={styles.deleteActionBtn}>
+            <Text style={styles.deleteActionText}>Delete</Text>
+          </TouchableOpacity>
         </View>
-      </View>
-      <Text style={styles.subtitle}>Your saved shows and watch progress</Text>
+      ) : (
+        <>
+          <View style={styles.header}>
+            <Text style={styles.title}>My List</Text>
+            <View style={styles.countBadge}>
+              <Text style={styles.countText}>{totalCount} Videos</Text>
+            </View>
+          </View>
+          <Text style={styles.subtitle}>Your saved shows and watch progress</Text>
+        </>
+      )}
 
       {/* ── Tab bar ── */}
       <View style={styles.tabBar}>
         <TouchableOpacity
           style={[styles.tab, activeTab === TAB_SAVED && styles.tabActive]}
-          onPress={() => setActiveTab(TAB_SAVED)}
+          onPress={() => {
+            setActiveTab(TAB_SAVED);
+            cancelSelection();
+          }}
         >
           <Text style={[styles.tabText, activeTab === TAB_SAVED && styles.tabTextActive]}>
             Saved {bookmarks.length > 0 ? `(${bookmarks.length})` : ''}
@@ -454,7 +484,10 @@ export default function MyListScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === TAB_CONTINUE && styles.tabActive]}
-          onPress={() => setActiveTab(TAB_CONTINUE)}
+          onPress={() => {
+            setActiveTab(TAB_CONTINUE);
+            cancelSelection();
+          }}
         >
           <Text style={[styles.tabText, activeTab === TAB_CONTINUE && styles.tabTextActive]}>
             Continue Watching {watchHistory.length > 0 ? `(${watchHistory.length})` : ''}
@@ -495,8 +528,11 @@ export default function MyListScreen() {
                     duration_sec: displayEntry.duration_sec,
                     progress_sec: displayEntry.progress_sec,
                     total_episodes: displayEntry.total_episodes || null,
+                    tags: displayEntry.tags,
                   }}
-                  onPress={() => handleCardPress({
+                  selectionMode={selectionMode}
+                  selected={selectedItems.has(item.bookmark_id)}
+                  onPress={() => handleCardPressAction({
                     show_id: displayEntry.show_id,
                     show_title: displayEntry.show_title,
                     thumbnail_url: displayEntry.thumbnail_url,
@@ -505,8 +541,9 @@ export default function MyListScreen() {
                     duration_sec: displayEntry.duration_sec,
                     progress_sec: displayEntry.progress_sec,
                     total_episodes: displayEntry.total_episodes || 1,
+                    bookmark_id: item.bookmark_id,
                   })}
-                  onDelete={() => handleRemoveBookmark(item)}
+                  onLongPress={() => handleCardLongPress(item)}
                 />
               );
             }}
@@ -538,23 +575,43 @@ export default function MyListScreen() {
                   duration_sec: item.duration_sec,
                   progress_sec: item.progress_sec,
                   total_episodes: item.total_episodes || null,
+                  tags: item.tags,
                 }}
-                onPress={() => handleCardPress({
-                  show_id: item.show_id,
-                  show_title: item.show_title,
-                  thumbnail_url: item.thumbnail_url,
-                  episode_id: item.episode_id,
-                  episode_num: item.episode_num,
-                  duration_sec: item.duration_sec,
-                  progress_sec: item.progress_sec,
-                  total_episodes: item.total_episodes || 1,
-                })}
-                onDelete={() => handleRemoveWatchHistory(item)}
+                selectionMode={selectionMode}
+                selected={selectedItems.has(item.history_id)}
+                onPress={() => handleCardPressAction(item)}
+                onLongPress={() => handleCardLongPress(item)}
               />
             )}
           />
         )
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Modal visible={deleteModalVisible} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Delete Selected</Text>
+            <Text style={styles.modalText}>
+              Are you sure you want to delete the selected videos from your list?
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalBtnCancel}
+                onPress={() => setDeleteModalVisible(false)}
+              >
+                <Text style={styles.modalBtnCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalBtnDelete}
+                onPress={confirmDeleteSelected}
+              >
+                <Text style={styles.modalBtnDeleteText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -623,5 +680,90 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  selectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    marginTop: 6,
+  },
+  selectionTitle: {
+    color: theme.white,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  cancelBtn: {
+    padding: 8,
+  },
+  cancelBtnText: {
+    color: theme.white,
+    fontSize: 16,
+  },
+  deleteActionBtn: {
+    padding: 8,
+    backgroundColor: theme.crimson,
+    borderRadius: 8,
+  },
+  deleteActionText: {
+    color: theme.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    backgroundColor: theme.surface,
+    width: '80%',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    color: theme.white,
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  modalText: {
+    color: theme.gray,
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  modalBtnCancel: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+  },
+  modalBtnCancelText: {
+    color: theme.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalBtnDelete: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 24,
+    backgroundColor: theme.crimson,
+    alignItems: 'center',
+  },
+  modalBtnDeleteText: {
+    color: theme.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

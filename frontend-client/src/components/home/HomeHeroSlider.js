@@ -96,9 +96,18 @@ export default function HomeHeroSlider({ banners = [], onBannerPress }) {
                 <Text style={styles.title} numberOfLines={2}>
                   {item.show_title || item.title}
                 </Text>
+
                 <View style={styles.watchRow}>
-                  <Ionicons name="play-circle" size={18} color={theme.crimson} />
                   <Text style={styles.watchText}>Watch now</Text>
+                </View>
+
+                <View style={styles.heroPlayBtn}>
+                  <Ionicons
+                    name="play"
+                    size={28}
+                    color="#000"
+                    style={styles.heroPlayIcon}
+                  />
                 </View>
               </View>
             </Pressable>
@@ -154,7 +163,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: theme.white,
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: '800',
     marginBottom: 6,
   },
@@ -163,10 +172,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  heroPlayBtn: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    width: 56,      // was 28
+    height: 56,     // was 28
+    borderRadius: 28,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroPlayIcon: {
+    marginLeft: 3,
+  },
   watchText: {
     color: theme.white,
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
   },
   dots: {
     flexDirection: 'row',

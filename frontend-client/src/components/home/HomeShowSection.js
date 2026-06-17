@@ -15,6 +15,18 @@ import { API_BASE_URL } from '../../constants/config';
 
 const CARD_WIDTH = 108;
 
+function ThumbnailProgressBar({ progressSec, durationSec }) {
+  if (!durationSec || durationSec === 0) return null;
+  const pct = Math.min((progressSec / durationSec) * 100, 100);
+  if (pct <= 0) return null;
+
+  return (
+    <View style={styles.progressBarTrack}>
+      <View style={[styles.progressBarFill, { width: `${pct}%` }]} />
+    </View>
+  );
+}
+
 function resolveThumbnailUrl(url) {
   if (!url) return null;
   if (url.startsWith('http')) return url;
@@ -41,19 +53,17 @@ function SectionCard({ item, onPress, compact }) {
             {formatViews(item.view_count)}
           </Text>
         </View>
+        <ThumbnailProgressBar
+          progressSec={item.progress_sec || 0}
+          durationSec={item.duration_sec || 0}
+        />
       </View>
       <Text style={styles.cardTitle} numberOfLines={2}>
         {item.title}
       </Text>
-      {item.tags?.length > 0 ? (
-        <Text style={styles.cardTags} numberOfLines={1}>
-          {item.tags.join(' · ')}
-        </Text>
-      ) : (
-        <Text style={styles.cardCategory} numberOfLines={1}>
-          {item.category_name || item.category || ''}
-        </Text>
-      )}
+      <Text style={styles.cardTags} numberOfLines={1}>
+        {item.tags?.length > 0 ? item.tags[0] : (item.category_name || item.category || '')}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -234,15 +244,29 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   cardTags: {
-    color: theme.white,
+    color: '#E0E0E0',
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '400',
     marginTop: 3,
   },
   cardCategory: {
-    color: theme.gray,
+    color: '#E0E0E0',
     fontSize: 10,
+    fontWeight: '400',
     marginTop: 3,
+  },
+  progressBarTrack: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: theme.crimson,
+    borderRadius: 2,
   },
   empty: {
     color: theme.gray,

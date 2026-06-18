@@ -24,7 +24,13 @@ function getSignedHlsPath(objectName, expirySeconds = config.hls.signedUrlTtl) {
   const episodePrefix = getHlsEpisodePrefix(normalizedObjectName);
   if (!episodePrefix) return null;
 
-  const expires = Math.floor(Date.now() / 1000) + expirySeconds;
+  // ✅ Round NOW down to the nearest window so all users in that
+  // window get the same token → same Cloudflare cache key → HIT
+  const windowSeconds = expirySeconds;           // e.g. 7200 = 2-hour window
+  const now = Math.floor(Date.now() / 1000);
+  const windowStart = Math.floor(now / windowSeconds) * windowSeconds;
+  const expires = windowStart + windowSeconds;   // token valid until end of window
+
   const signatureBase = `${expires}/${episodePrefix} ${config.hls.signingSecret}`;
   const signature = toSecureLinkDigest(signatureBase);
 

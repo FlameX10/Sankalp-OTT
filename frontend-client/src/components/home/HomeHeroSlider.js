@@ -93,12 +93,10 @@ export default function HomeHeroSlider({ banners = [], onBannerPress }) {
               )}
               <View style={styles.overlay} />
               <View style={styles.caption}>
-                <Text style={styles.title} numberOfLines={2}>
-                  {item.show_title || item.title}
-                </Text>
-
-                <View style={styles.watchRow}>
-                  <Text style={styles.watchText}>Watch now</Text>
+                <View style={styles.showNameRow}>
+                  <Text style={styles.heroShowName} numberOfLines={2}>
+                    {item.show_title || item.title}
+                  </Text>
                 </View>
 
                 <View style={styles.heroPlayBtn}>
@@ -161,16 +159,10 @@ const styles = StyleSheet.create({
     right: 14,
     bottom: 14,
   },
-  title: {
-    color: theme.white,
-    fontSize: 28,
-    fontWeight: '800',
-    marginBottom: 6,
-  },
-  watchRow: {
+  showNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    paddingRight: 84,
   },
   heroPlayBtn: {
     position: 'absolute',
@@ -186,10 +178,14 @@ const styles = StyleSheet.create({
   heroPlayIcon: {
     marginLeft: 3,
   },
-  watchText: {
+  heroShowName: {
     color: theme.white,
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 30,
+    lineHeight: 34,
+    fontWeight: '900',
+    textShadowColor: 'rgba(0,0,0,0.65)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   dots: {
     flexDirection: 'row',

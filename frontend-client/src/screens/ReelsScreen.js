@@ -54,6 +54,12 @@ const COLUMN_WIDTH = (SCREEN_WIDTH - 32) / 3;
 const TAG_GRID_GAP = 8;
 const TAG_GRID_WIDTH = SCREEN_WIDTH - 32;
 const TAG_GRID_ITEM_WIDTH = (TAG_GRID_WIDTH - TAG_GRID_GAP * 2) / 3;
+const TAG_FILTER_ITEM_HEIGHT = 34;
+const TAG_FILTER_ROW_GAP = 8;
+const TAG_FILTER_VISIBLE_ROWS = 4;
+const TAG_FILTER_MAX_HEIGHT =
+  TAG_FILTER_ITEM_HEIGHT * TAG_FILTER_VISIBLE_ROWS + TAG_FILTER_ROW_GAP * TAG_FILTER_VISIBLE_ROWS;
+const HOME_SECTION_PREVIEW_LIMIT = 10;
 const feedApi = createAuthenticatedApi({
   baseURL: API_BASE_URL,
 });
@@ -78,6 +84,18 @@ function showMatchesCategory(show, tab) {
     || show.category === tab.name;
 }
 
+function ThumbnailProgressBar({ progressSec, durationSec }) {
+  if (!durationSec || durationSec === 0) return null;
+  const pct = Math.min((progressSec / durationSec) * 100, 100);
+  if (pct <= 0) return null;
+
+  return (
+    <View style={styles.progressBarTrack}>
+      <View style={[styles.progressBarFill, { width: `${pct}%` }]} />
+    </View>
+  );
+}
+
 const DramaCard = ({ item, onPress }) => (
   <TouchableOpacity style={styles.cardContainer} onPress={onPress} activeOpacity={0.85}>
     <View style={styles.imageWrapper}>
@@ -97,6 +115,10 @@ const DramaCard = ({ item, onPress }) => (
           {formatViews(item.view_count || item.views)}
         </Text>
       </View>
+      <ThumbnailProgressBar
+        progressSec={item.progress_sec || 0}
+        durationSec={item.duration_sec || 0}
+      />
     </View>
     <Text style={styles.dramaTitle} numberOfLines={2}>{item.title}</Text>
     <Text style={styles.dramaTagsText} numberOfLines={1}>
@@ -207,17 +229,22 @@ export default function PopularScreen() {
   }, [selectedTags, searchQuery]);
 
   const isSearchActive = Boolean(effectiveSearch);
-  const trendingShows = useMemo(() => {
+  const allTrendingShows = useMemo(() => {
     return [...shows]
-      .sort((a, b) => (b.view_count || b.views || 0) - (a.view_count || a.views || 0))
-      .slice(0, 9);
+      .sort((a, b) => (b.view_count || b.views || 0) - (a.view_count || a.views || 0));
   }, [shows]);
+  const trendingShowsPreview = useMemo(
+    () => allTrendingShows.slice(0, HOME_SECTION_PREVIEW_LIMIT),
+    [allTrendingShows]
+  );
   const activeCategory = useMemo(
     () => tabs.find((tab) => sameCategoryId(tab.id, activeTab)) || tabs[0] || { id: null, name: 'All' },
     [tabs, activeTab]
   );
   const categoryShowsPreview = useMemo(
-    () => shows.filter((show) => showMatchesCategory(show, activeCategory)).slice(0, 12),
+    () => shows
+      .filter((show) => showMatchesCategory(show, activeCategory))
+      .slice(0, HOME_SECTION_PREVIEW_LIMIT),
     [shows, activeCategory]
   );
 
@@ -228,11 +255,11 @@ export default function PopularScreen() {
         || { id: null, name: 'All' };
       return shows.filter((show) => showMatchesCategory(show, selectedExpandedTab));
     }
-    if (expandedSection === 'trending') return trendingShows;
+    if (expandedSection === 'trending') return allTrendingShows;
     if (expandedSection === 'continue') return watchHistory;
     if (expandedSection === 'saved') return bookmarks;
     return [];
-  }, [expandedSection, shows, tabs, trendingShows, watchHistory, bookmarks, expandedCategoryTab]);
+  }, [expandedSection, shows, tabs, allTrendingShows, watchHistory, bookmarks, expandedCategoryTab]);
 
   useEffect(() => {
     filterPanelOpenRef.current = filterPanelOpen;
@@ -289,6 +316,27 @@ export default function PopularScreen() {
     ));
     setSearchQuery('');
   }, []);
+
+  const removeSelectedTag = useCallback((tagName) => {
+    setSelectedTags((prev) => prev.filter((tag) => tag !== tagName));
+  }, []);
+
+  const buildMyListPreviewItems = useCallback((entries) => (
+    entries.slice(0, HOME_SECTION_PREVIEW_LIMIT).map((entry) => {
+      const showDetails = shows.find(s => s.id === entry.show_id || s.show_id === entry.show_id);
+      return {
+        id: entry.history_id || entry.bookmark_id,
+        title: entry.show_title,
+        thumbnail_url: entry.thumbnail_url,
+        category: entry.category,
+        tags: showDetails?.tags || entry.tags || [],
+        progress_sec: entry.progress_sec,
+        duration_sec: entry.duration_sec,
+        view_count: 0,
+        _entry: entry,
+      };
+    })
+  ), [shows]);
 
   const loadShows = useCallback(async () => {
     setLoading(true);
@@ -588,16 +636,41 @@ export default function PopularScreen() {
           <View style={styles.searchRow}>
             <View style={[styles.searchBar, showFilterButton && styles.searchBarWithFilter]}>
               <Ionicons name="search" size={18} color="#666" style={styles.searchIcon} />
-              <TextInput
-                ref={searchInputRef}
-                style={styles.searchInput}
-                placeholder="Search dramas or tags..."
-                placeholderTextColor="#666"
-                value={searchQuery}
-                onChangeText={handleSearchTextChange}
-                onFocus={handleSearchFocus}
-                onBlur={handleSearchBlur}
-              />
+              {selectedTags.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={styles.selectedFilterScrollContent}
+                  style={styles.selectedFilterScroll}
+                >
+                  {selectedTags.map((tag) => (
+                    <View key={tag} style={styles.selectedFilterChip}>
+                      <Text style={styles.selectedFilterText} numberOfLines={1}>
+                        {tag}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => removeSelectedTag(tag)}
+                        hitSlop={8}
+                        style={styles.selectedFilterRemove}
+                      >
+                        <Ionicons name="close" size={12} color={theme.gray} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              ) : (
+                <TextInput
+                  ref={searchInputRef}
+                  style={styles.searchInput}
+                  placeholder="Search dramas or tags..."
+                  placeholderTextColor="#666"
+                  value={searchQuery}
+                  onChangeText={handleSearchTextChange}
+                  onFocus={handleSearchFocus}
+                  onBlur={handleSearchBlur}
+                />
+              )}
               {(selectedTags.length > 0 || searchQuery.length > 0) && (
                 <TouchableOpacity onPress={clearSearch} hitSlop={8}>
                   <Ionicons name="close-circle" size={18} color="#666" />
@@ -739,7 +812,7 @@ export default function PopularScreen() {
 
           <HomeShowSection
             title="Trending"
-            items={trendingShows}
+            items={trendingShowsPreview}
             onItemPress={(item) => openDetails(item)}
             onExpand={() => setExpandedSection('trending')}
           />
@@ -747,20 +820,7 @@ export default function PopularScreen() {
           {accessToken && watchHistory.length > 0 ? (
             <HomeShowSection
               title="Continue Watching"
-              items={watchHistory.map((entry) => {
-                const showDetails = shows.find(s => s.id === entry.show_id || s.show_id === entry.show_id);
-                return {
-                  id: entry.history_id,
-                  title: entry.show_title,
-                  thumbnail_url: entry.thumbnail_url,
-                  category: entry.category,
-                  tags: showDetails?.tags || entry.tags || [],
-                  progress_sec: entry.progress_sec,
-                  duration_sec: entry.duration_sec,
-                  view_count: 0,
-                  _entry: entry,
-                };
-              })}
+              items={buildMyListPreviewItems(watchHistory)}
               onItemPress={(item) => openMyListEntry(item._entry)}
               onExpand={() => setExpandedSection('continue')}
             />
@@ -769,20 +829,7 @@ export default function PopularScreen() {
           {accessToken && bookmarks.length > 0 ? (
             <HomeShowSection
               title="Saved"
-              items={bookmarks.map((entry) => {
-                const showDetails = shows.find(s => s.id === entry.show_id || s.show_id === entry.show_id);
-                return {
-                  id: entry.bookmark_id,
-                  title: entry.show_title,
-                  thumbnail_url: entry.thumbnail_url,
-                  category: entry.category,
-                  tags: showDetails?.tags || entry.tags || [],
-                  progress_sec: entry.progress_sec,
-                  duration_sec: entry.duration_sec,
-                  view_count: 0,
-                  _entry: entry,
-                };
-              })}
+              items={buildMyListPreviewItems(bookmarks)}
               onItemPress={(item) => openMyListEntry(item._entry)}
               onExpand={() => setExpandedSection('saved')}
             />
@@ -859,6 +906,9 @@ export default function PopularScreen() {
                       title: entry.show_title,
                       thumbnail_url: entry.thumbnail_url,
                       category: entry.category,
+                      tags: entry.tags || [],
+                      progress_sec: entry.progress_sec,
+                      duration_sec: entry.duration_sec,
                     }}
                     onPress={() => {
                       setExpandedSection(null);
@@ -941,6 +991,41 @@ const styles = StyleSheet.create({
     height: 40,
     padding: 0,
   },
+  selectedFilterScroll: {
+    flex: 1,
+  },
+  selectedFilterScrollContent: {
+    alignItems: 'center',
+    gap: 6,
+    paddingRight: 6,
+  },
+  selectedFilterChip: {
+    maxWidth: 120,
+    height: 26,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingLeft: 9,
+    paddingRight: 5,
+    borderRadius: 6,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  selectedFilterText: {
+    flexShrink: 1,
+    color: theme.gray,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  selectedFilterRemove: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
   filterButton: {
     width: 40,
     height: 40,
@@ -979,7 +1064,7 @@ const styles = StyleSheet.create({
     width: TAG_GRID_WIDTH,
   },
   tagFilterScroll: {
-    maxHeight: 220,
+    maxHeight: TAG_FILTER_MAX_HEIGHT,
   },
   tagSearchBackdrop: {
     position: 'absolute',
@@ -1001,15 +1086,14 @@ const styles = StyleSheet.create({
   },
   tagSearchItem: {
     width: TAG_GRID_ITEM_WIDTH,
-    minHeight: 42,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    height: TAG_FILTER_ITEM_HEIGHT,
+    paddingHorizontal: 10,
     marginRight: TAG_GRID_GAP,
-    marginBottom: 10,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginBottom: TAG_FILTER_ROW_GAP,
+    borderRadius: 8,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1017,12 +1101,12 @@ const styles = StyleSheet.create({
     marginRight: 0,
   },
   tagSearchItemActive: {
-    backgroundColor: 'rgba(255, 45, 85, 0.9)',
-    borderColor: theme.crimson,
+    backgroundColor: theme.surfaceLight,
+    borderColor: '#5A0068',
   },
   tagSearchItemText: {
-    color: 'rgba(255,255,255,0.82)',
-    fontSize: 13,
+    color: theme.gray,
+    fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -1065,6 +1149,19 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   viewCountText: { color: '#fff', fontSize: 10, fontWeight: '600' },
+  progressBarTrack: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: theme.crimson,
+    borderRadius: 2,
+  },
   dramaTitle: { color: '#FFF', fontSize: 13, marginTop: 8, fontWeight: '500', lineHeight: 18 },
   dramaTagsText: { color: '#E0E0E0', fontSize: 11, marginTop: 4, fontWeight: '400' },
   categoryText: { color: '#666', fontSize: 11, marginTop: 4 },

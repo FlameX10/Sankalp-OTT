@@ -254,7 +254,8 @@ export default function ShortVideoReelItem({
   const renderSeekControls = () => (
     <View style={styles.ottSeekRow}>
       <Pressable style={styles.ottSeekBtn} onPress={handleSkipBack} hitSlop={12}>
-        <MaterialCommunityIcons name="rewind-10" size={32} color="#fff" />
+        <MaterialCommunityIcons name="rewind" size={18} color="#fff" />
+        <Text style={styles.ottSeekText}>10</Text>
       </Pressable>
       <Pressable
         style={styles.ottPlayPauseFab}
@@ -269,7 +270,8 @@ export default function ShortVideoReelItem({
         />
       </Pressable>
       <Pressable style={styles.ottSeekBtn} onPress={handleSkipForward} hitSlop={12}>
-        <MaterialCommunityIcons name="fast-forward-10" size={32} color="#fff" />
+        <Text style={styles.ottSeekText}>10</Text>
+        <MaterialCommunityIcons name="fast-forward" size={18} color="#fff" />
       </Pressable>
     </View>
   );

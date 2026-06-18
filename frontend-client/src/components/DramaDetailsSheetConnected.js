@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 20,
     backgroundColor: theme.crimson,
-    borderRadius: 24,
+    borderRadius: 8,
     paddingVertical: 14,
     paddingHorizontal: 20,
   },

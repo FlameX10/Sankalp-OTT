@@ -38,6 +38,7 @@ import {
 } from '../redux/slices/showPlayerSlice';
 import { upsertWatchHistory } from '../redux/slices/myListSlice';
 import { ROUTES } from '../constants/routes';
+import { useLandscapePlaybackContext } from '../context/LandscapePlaybackContext';
 
 const PLAYER_PAGE_SIZE = 30;
 
@@ -68,6 +69,7 @@ export default function ShowPlayerScreen({ navigation }) {
   const fromDeepLink = !!route.params?.fromDeepLink; // NEW — arrived via shared link
   const dramaSheetSource = fromForYou ? 'forYou' : fromHome ? 'home' : null;
   const detailsSheetSource = dramaSheetSource || (fromMyList ? 'home' : null);
+  const { isLandscape } = useLandscapePlaybackContext();
   const insets = useSafeAreaInsets();
   const flatListRef = useRef(null);
   const pendingAutoAdvanceIndexRef = useRef(null);
@@ -321,6 +323,7 @@ export default function ShowPlayerScreen({ navigation }) {
     <View style={styles.screen} onLayout={onScreenLayout}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
+      {!isLandscape ? (
       <Pressable
         style={[styles.backButton, { top: insets.top + 10 }]}
         onPress={handleClose}
@@ -328,11 +331,13 @@ export default function ShowPlayerScreen({ navigation }) {
       >
         <Ionicons name="chevron-back" size={28} color="#fff" />
       </Pressable>
+      ) : null}
 
       <FlatList
         ref={flatListRef}
         data={episodes}
         keyExtractor={(item) => item.episode_id}
+        scrollEnabled={!isLandscape}
         renderItem={({ item, index }) => (
           <ShortVideoReelItem
             item={item}

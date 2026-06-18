@@ -21,6 +21,7 @@ import {
 } from '../components/shortVideoPlayer';
 import { API_BASE_URL } from '../constants/config';
 import { ROUTES } from '../constants/routes';
+import { useLandscapePlaybackContext } from '../context/LandscapePlaybackContext';
 import {
   clearShowMode,
   clearForYouDramaSheetSession,
@@ -58,6 +59,7 @@ export default function ForYouScreen() {
   const sheetSession = useSelector(selectForYouDramaSheetSession);
   const reopenAfterPlayer = useSelector(selectForYouReopenSheetAfterPlayer);
   const isFocused = useIsFocused();
+  const { isLandscape } = useLandscapePlaybackContext();
   const accessToken = useSelector((state) => state.auth?.accessToken);
   const flatListRef = useRef(null);
   const pendingAutoAdvanceIndexRef = useRef(null);
@@ -374,6 +376,7 @@ export default function ForYouScreen() {
         bounces={false}
         overScrollMode="never"
         showsVerticalScrollIndicator={false}
+        scrollEnabled={!isLandscape}
         onMomentumScrollEnd={onMomentumScrollEnd}
         removeClippedSubviews
         initialNumToRender={1}

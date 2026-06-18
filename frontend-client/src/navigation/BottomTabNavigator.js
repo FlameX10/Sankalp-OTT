@@ -9,6 +9,7 @@ import MyListScreen from '../screens/MyListScreen';
 import ProfileStackNavigator from './ProfileStackNavigator';
 import { ROUTES } from '../constants/routes';
 import { theme } from '../constants/theme';
+import { useLandscapePlaybackContext } from '../context/LandscapePlaybackContext';
 
 const Tab = createBottomTabNavigator();
 
@@ -21,6 +22,7 @@ const TAB_ICONS = {
 
 export default function BottomTabNavigator() {
   const insets = useSafeAreaInsets();
+  const { isLandscape } = useLandscapePlaybackContext();
 
   return (
     <Tab.Navigator
@@ -29,7 +31,9 @@ export default function BottomTabNavigator() {
         headerShown: false,
         tabBarActiveTintColor: theme.crimson,
         tabBarInactiveTintColor: theme.gray,
-        tabBarStyle: {
+        tabBarStyle: isLandscape
+          ? { display: 'none' }
+          : {
           backgroundColor: theme.surface,
           borderTopColor: theme.border,
           borderTopWidth: 1,

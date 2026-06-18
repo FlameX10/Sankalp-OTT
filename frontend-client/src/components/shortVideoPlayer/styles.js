@@ -449,4 +449,85 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingLeft: 2,
   },
+
+  bottomMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  bottomMetaTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  landscapeToggleBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.24)',
+    marginBottom: 10,
+  },
+
+  landscapeChromeRoot: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 40,
+    backgroundColor: '#000',
+    justifyContent: 'space-between',
+  },
+  landscapeTapZone: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+  landscapeTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 30,
+  },
+  landscapeTopActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  landscapeModeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+  },
+  landscapeModeBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  landscapeCenterWrap: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 25,
+  },
+  landscapeBottomBar: {
+    zIndex: 30,
+    width: '100%',
+  },
+  landscapeTitle: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 6,
+    textShadowColor: 'rgba(0,0,0,0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
+  landscapeEpText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontWeight: '600',
+  },
 });

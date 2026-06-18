@@ -6,6 +6,7 @@ import RootStackNavigator from './src/navigation/RootStackNavigator';
 import { PlaybackSpeedProvider } from './src/context/PlaybackSpeedContext';
 import { PlaybackVolumeProvider } from './src/context/PlaybackVolumeContext';
 import { VideoQualityProvider } from './src/context/VideoQualityContext';
+import { LandscapePlaybackProvider } from './src/context/LandscapePlaybackContext';
 import { store } from './src/redux';
 import { setStore, setAuthActions } from './src/services/api';
 import { setTokens, logout } from './src/redux/slices/authSlice';
@@ -33,9 +34,11 @@ export default function App() {
         <PlaybackSpeedProvider>
           <PlaybackVolumeProvider>
             <VideoQualityProvider>
+              <LandscapePlaybackProvider>
               {/* "light" keeps status bar text/icons white on the dark app background */}
               <StatusBar style="light" />
               <RootStackNavigator />
+              </LandscapePlaybackProvider>
             </VideoQualityProvider>
           </PlaybackVolumeProvider>
         </PlaybackSpeedProvider>

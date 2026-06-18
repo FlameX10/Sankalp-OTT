@@ -23,10 +23,12 @@ import { CaptureProtection, useCaptureProtection } from 'react-native-capture-pr
 
 import ProgressBar from './ProgressBar';
 import SideAction from './SideAction';
+import LandscapePlayerChrome from './LandscapePlayerChrome';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from './constants';
 import { styles } from './styles';
 import { shortVideoTheme } from './theme';
 import useShortVideoPlayback from './useShortVideoPlayback';
+import useLandscapePlayback from './useLandscapePlayback';
 import { formatCount } from './utils';
 import { ROUTES } from '../../constants/routes';
 import {
@@ -74,6 +76,7 @@ export default function ShortVideoReelItem({
   shouldPreload = false,
   autoAdvanceOnEnd = true,
   onPlaybackEnd = null,
+  enableLandscapeMode = true,
 }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -184,6 +187,21 @@ export default function ShortVideoReelItem({
   const shouldRenderVideo = Boolean((isActive || shouldPreload) && isFocused && streamUrl && !isLocked);
   const videoIsVisible = isActive && shouldRenderVideo && firstFrameReady;
   const showActiveBuffering = isActive && shouldRenderVideo && !firstFrameReady;
+  const {
+    isLandscapeActive,
+    enterLandscape,
+    exitLandscape,
+  } = useLandscapePlayback({
+    isActive: isActive && !isLocked && firstFrameReady,
+    enabled: enableLandscapeMode,
+  });
+  const videoResizeMode = isLandscapeActive ? 'contain' : 'cover';
+  const showPortraitChrome = !isLandscapeActive;
+  const showLandscapeToggle = enableLandscapeMode
+    && showPortraitChrome
+    && isActive
+    && !isLocked
+    && firstFrameReady;
   const showMainOverlay = showOttOverlayControls || controlsVisible || manuallyPaused;
   const effectiveMuted = muted || volume <= 0;
 
@@ -337,10 +355,10 @@ export default function ShortVideoReelItem({
   ]);
 
   const handleOttScrimPress = useCallback(() => {
-    if (!showOttOverlayControls || !isActive || isLocked) return;
+    if ((!showOttOverlayControls && !isLandscapeActive) || !isActive || isLocked) return;
     setControlsVisible(true);
     setControlsInteractionTick((tick) => tick + 1);
-  }, [showOttOverlayControls, isActive, isLocked]);
+  }, [showOttOverlayControls, isLandscapeActive, isActive, isLocked]);
 
   const handleNonOttVideoPress = useCallback(() => {
     if (showOttOverlayControls || !isActive || isLocked) return;
@@ -408,7 +426,11 @@ export default function ShortVideoReelItem({
       : <DefaultTopOverlay top={insets.top + 10} style={styles.topSearch} />;
 
   return (
-    <View style={[styles.reelContainer, itemHeight ? { height: itemHeight } : null]}>
+    <View style={[
+      styles.reelContainer,
+      itemHeight ? { height: itemHeight } : null,
+      isLandscapeActive ? { backgroundColor: '#000' } : null,
+    ]}>
       {/* Thumbnail / blurred placeholder */}
       {item.thumbnail_url ? (
         <Image
@@ -430,7 +452,7 @@ export default function ShortVideoReelItem({
               ref={videoRef}
               source={{ uri: streamUrl }}
               style={[StyleSheet.absoluteFill, { opacity: videoIsVisible ? 1 : 0 }]}
-              resizeMode="cover"
+              resizeMode={videoResizeMode}
               paused={paused}
               rate={playbackRate}
               repeat={repeatPlayback && !autoAdvanceOnEnd}
@@ -466,7 +488,7 @@ export default function ShortVideoReelItem({
                 ref={videoRef}
                 source={{ uri: streamUrl }}
                 style={[StyleSheet.absoluteFill, { opacity: videoIsVisible ? 1 : 0 }]}
-                resizeMode="cover"
+                resizeMode={videoResizeMode}
                 paused={paused}
                 rate={playbackRate}
                 repeat={repeatPlayback && !autoAdvanceOnEnd}
@@ -492,7 +514,7 @@ export default function ShortVideoReelItem({
         )
       ) : null}
 
-      {!showOttOverlayControls && isActive && streamUrl && !isLocked && firstFrameReady ? (
+      {!showOttOverlayControls && showPortraitChrome && isActive && streamUrl && !isLocked && firstFrameReady ? (
         <Pressable
           style={styles.nonOttTapZone}
           onPress={handleNonOttVideoPress}
@@ -500,7 +522,7 @@ export default function ShortVideoReelItem({
       ) : null}
 
       {/* Manual-pause overlay (non-OTT reels) */}
-      {!showOttOverlayControls && isActive && manuallyPaused && !isLocked && firstFrameReady ? (
+      {!showOttOverlayControls && showPortraitChrome && isActive && manuallyPaused && !isLocked && firstFrameReady ? (
         <TouchableWithoutFeedback onPress={handleNonOttVideoPress}>
           <View style={styles.pauseOverlay}>
             <View style={styles.pauseIconCircle}>
@@ -511,7 +533,7 @@ export default function ShortVideoReelItem({
       ) : null}
 
       {/* Non-OTT play/pause button (consistent with OTT controls) */}
-      {!showOttOverlayControls && isActive && streamUrl && !isLocked && firstFrameReady ? (
+      {!showOttOverlayControls && showPortraitChrome && isActive && streamUrl && !isLocked && firstFrameReady ? (
         <View style={styles.ottChromeRoot} pointerEvents="box-none">
           <View style={[styles.ottTopBar, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
             <View style={{ flex: 1 }} />
@@ -570,7 +592,7 @@ export default function ShortVideoReelItem({
       ) : null}
 
       {/* OTT-style controls (For You / Show Player) */}
-      {isActive && showOttOverlayControls && streamUrl && !isLocked && firstFrameReady ? (
+      {isActive && showOttOverlayControls && showPortraitChrome && streamUrl && !isLocked && firstFrameReady ? (
         <View style={styles.ottChromeRoot} pointerEvents="box-none">
           <Pressable
             style={[
@@ -619,6 +641,33 @@ export default function ShortVideoReelItem({
             </View>
           ) : null}
         </View>
+      ) : null}
+
+      {isLandscapeActive && isActive && streamUrl && !isLocked && firstFrameReady ? (
+        <LandscapePlayerChrome
+          insets={insets}
+          item={item}
+          controlsOpacity={controlsOpacity}
+          showMainOverlay={showMainOverlay}
+          controlsVisible={controlsVisible}
+          manuallyPaused={manuallyPaused}
+          currentTime={currentTime}
+          duration={duration}
+          seekTo={seekTo}
+          handleScrubStart={handleScrubStart}
+          handleScrubEnd={handleScrubEnd}
+          handleOttScrimPress={handleOttScrimPress}
+          handlePlayPausePress={handlePlayPausePress}
+          handleSkipBack={handleSkipBack}
+          handleSkipForward={handleSkipForward}
+          renderVolumeControl={renderVolumeControl}
+          qualityLabel={qualityLabel}
+          onQualityPress={() => setQualityModalVisible(true)}
+          playbackRate={playbackRate}
+          showPlaybackSpeedControl={showPlaybackSpeedControl}
+          onSpeedPress={() => setSpeedModalVisible(true)}
+          onExitLandscape={exitLandscape}
+        />
       ) : null}
 
       {showPlaybackSpeedControl ? (
@@ -700,6 +749,7 @@ export default function ShortVideoReelItem({
         </Pressable>
       </Modal>
 
+      {showPortraitChrome ? (
       <Animated.View
           style={[
             styles.uiOverlay,
@@ -730,6 +780,8 @@ export default function ShortVideoReelItem({
           </View>
 
           <View style={styles.textContent}>
+            <View style={styles.bottomMetaRow}>
+              <View style={styles.bottomMetaTextCol}>
             <TouchableOpacity
               style={styles.titleRow}
               activeOpacity={0.8}
@@ -785,6 +837,19 @@ export default function ShortVideoReelItem({
                 )}
               </View>
             ) : null}
+              </View>
+
+              {showLandscapeToggle ? (
+                <Pressable
+                  style={styles.landscapeToggleBtn}
+                  onPress={enterLandscape}
+                  hitSlop={10}
+                  accessibilityLabel="Switch to landscape view"
+                >
+                  <MaterialCommunityIcons name="phone-rotate-landscape" size={20} color="#fff" />
+                </Pressable>
+              ) : null}
+            </View>
 
             {!isLocked && firstFrameReady ? (
               <ProgressBar
@@ -821,6 +886,7 @@ export default function ShortVideoReelItem({
             ) : null}
           </View>
       </Animated.View>
+      ) : null}
 
       {/* iOS screen recording overlay */}
       {isBeingRecorded ? (

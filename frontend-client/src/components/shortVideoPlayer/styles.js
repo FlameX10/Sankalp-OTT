@@ -4,7 +4,7 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH } from './constants';
 import { shortVideoTheme } from './theme';
 
 export const styles = StyleSheet.create({
-  reelContainer: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
+  reelContainer: { flex: 1 },
   uiOverlay: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 16, zIndex: 20 },
 
   sideActionsColumn: {

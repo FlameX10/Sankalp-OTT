@@ -12,6 +12,7 @@ import {
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -81,6 +82,7 @@ export default function ShortVideoReelItem({
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const dispatch = useDispatch();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
   const { status } = useCaptureProtection();
 
@@ -118,7 +120,7 @@ export default function ShortVideoReelItem({
 
   const controlsOpacity = useRef(new Animated.Value(1)).current;
   const hideControlsTimerRef = useRef(null);
-  const layoutHeight = itemHeight || SCREEN_HEIGHT;
+  const layoutHeight = itemHeight || windowHeight;
   const hideControlsDelay = showOttOverlayControls ? 2000 : 3000;
   const bottomControlsPadding = showOttOverlayControls
     ? (itemHeight ? 10 : insets.bottom)
@@ -126,7 +128,7 @@ export default function ShortVideoReelItem({
       ? Math.max(insets.bottom + 34, 44)
       : Math.max(insets.bottom + 18, 24);
   const dramaVideoMaxHeight = Math.max(layoutHeight - insets.top - bottomControlsPadding - 24, 0);
-  const dramaVideoHeight = Math.min(SCREEN_WIDTH * (16 / 9), dramaVideoMaxHeight);
+  const dramaVideoHeight = Math.min(windowWidth * (16 / 9), dramaVideoMaxHeight);
   const dramaVideoTop = Math.max(insets.top + 12, (layoutHeight - dramaVideoHeight) / 2);
 
   useEffect(() => {
@@ -428,7 +430,8 @@ export default function ShortVideoReelItem({
   return (
     <View style={[
       styles.reelContainer,
-      itemHeight ? { height: itemHeight } : null,
+      { width: windowWidth },
+      itemHeight ? { height: itemHeight } : { height: layoutHeight },
       isLandscapeActive ? { backgroundColor: '#000' } : null,
     ]}>
       {/* Thumbnail / blurred placeholder */}
@@ -600,8 +603,8 @@ export default function ShortVideoReelItem({
               {
                 top: layoutHeight * 0.14,
                 bottom: layoutHeight * 0.32,
-                left: SCREEN_WIDTH * 0.06,
-                right: SCREEN_WIDTH * 0.2,
+                left: windowWidth * 0.06,
+                right: windowWidth * 0.2,
               },
             ]}
             onPress={handleOttScrimPress}

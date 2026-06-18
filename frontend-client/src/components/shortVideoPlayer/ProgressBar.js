@@ -1,11 +1,8 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { PanResponder, Text, View } from 'react-native';
+import { PanResponder, Text, useWindowDimensions, View } from 'react-native';
 
-import { SCREEN_WIDTH } from './constants';
 import { styles } from './styles';
 import { formatTime } from './utils';
-
-const DEFAULT_TRACK_WIDTH = SCREEN_WIDTH - 32;
 
 export default function ProgressBar({
   currentTime,
@@ -15,6 +12,9 @@ export default function ProgressBar({
   onScrubStart,
   onScrubEnd,
 }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const DEFAULT_TRACK_WIDTH = windowWidth - 32;
+
   const hitAreaRef = useRef(null);
   const trackWidthRef = useRef(DEFAULT_TRACK_WIDTH);
   const trackLeftRef = useRef(0);

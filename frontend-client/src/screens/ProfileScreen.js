@@ -8,12 +8,11 @@ import {
   Pressable,
   Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome6, Ionicons } from '@expo/vector-icons';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 
-import CoinIcon from '../components/CoinIcon';
 import GuestAccessPrompt from '../components/GuestAccessPrompt';
 import { theme } from '../constants/theme';
 import { ROUTES } from '../constants/routes';
@@ -232,7 +231,7 @@ export default function ProfileScreen({ navigation }) {
           </View>
         </View>
         <Pressable style={styles.coinsChip} onPress={goToMyWallet} hitSlop={8}>
-          <CoinIcon size={16} color={theme.gold} />
+          <FontAwesome6 name="coins" size={14} color={theme.gold} />
           <Text style={styles.coinsText}>{coins ?? 0}</Text>
         </Pressable>
       </View>

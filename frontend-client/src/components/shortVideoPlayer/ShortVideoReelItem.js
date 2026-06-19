@@ -83,6 +83,8 @@ export default function ShortVideoReelItem({
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const landscapeWidth = Math.max(windowWidth, windowHeight);
+  const landscapeHeight = Math.min(windowWidth, windowHeight);
 
   const { status } = useCaptureProtection();
 
@@ -197,7 +199,7 @@ export default function ShortVideoReelItem({
     isActive: isActive && !isLocked && firstFrameReady,
     enabled: enableLandscapeMode,
   });
-  const videoResizeMode = isLandscapeActive ? 'contain' : 'cover';
+  const videoResizeMode = 'cover';
   const showPortraitChrome = !isLandscapeActive;
   const showLandscapeToggle = enableLandscapeMode
     && showPortraitChrome
@@ -431,7 +433,7 @@ export default function ShortVideoReelItem({
     <View style={[
       styles.reelContainer,
       isLandscapeActive
-        ? { width: windowWidth, height: windowHeight, backgroundColor: '#000' }
+        ? { width: landscapeWidth, height: landscapeHeight, backgroundColor: '#000' }
         : [
             { width: windowWidth },
             itemHeight ? { height: itemHeight } : { height: layoutHeight },
@@ -478,6 +480,7 @@ export default function ShortVideoReelItem({
                 setVideoError(String(msg));
               }}
               allowsExternalPlayback={false}
+              preventsDisplaySleepDuringVideoPlayback={true}
             />
           </View>
         ) : (
@@ -518,6 +521,7 @@ export default function ShortVideoReelItem({
                   setVideoError(String(msg));
                 }}
                 allowsExternalPlayback={false}
+                preventsDisplaySleepDuringVideoPlayback={true}
               />
             </View>
           </TouchableWithoutFeedback>

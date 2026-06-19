@@ -4,7 +4,7 @@ export const sendNotificationSchema = Joi.object({
   title: Joi.string().max(255).required(),
   body: Joi.string().max(500).required(),
   type: Joi.string().valid('drama', 'membership', 'reward', 'reminder', 're-engage', 'custom').required(),
-  audience: Joi.string().valid('all', 'free', 'paid', 'weekly-plan', 'monthly-plan', 'annual-plan').default('all'),
+  audience: Joi.string().valid('all', 'free', 'paid', 'weekly-plan', 'monthly-plan', 'annual-plan', 'lifetime-plan').default('all'),
 }).required();
 
 export const updateNotificationConfigSchema = Joi.object({

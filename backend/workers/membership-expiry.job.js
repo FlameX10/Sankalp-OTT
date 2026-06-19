@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { randomUUID } from 'crypto';
 import { prisma } from '../prisma/client.js';
 import logger from '../config/logger.js';
+import { activeMembershipWhere } from '../modules/membership/membership.helpers.js';
 
 /**
  * =====================================================
@@ -73,7 +74,7 @@ export async function processExpiredMemberships() {
         const hasActiveMembership = await tx.userMembership.findFirst({
           where: {
             user_id: userId,
-            status: 'ACTIVE',
+            ...activeMembershipWhere(now),
           },
         });
 

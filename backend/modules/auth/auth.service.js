@@ -563,7 +563,7 @@ export const verifyOtpAndCreateUser = async (verificationData) => {
     });
 
     return {
-      user: { ...user, membership: null },
+      user: { ...user, memberships: [], has_all_access: false },
       accessToken,
       refreshToken,
       message: 'Email verified successfully. Welcome!',

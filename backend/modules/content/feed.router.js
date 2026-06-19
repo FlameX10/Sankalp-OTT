@@ -49,7 +49,7 @@ router.get('/for-you', allowGuest, async (req, res, next) => {
 
       // Check access for this episode
       const { is_locked, lock_reason } = await checkEpisodeAccess(
-        userId, isGuest, ep1.id, ep1.is_free
+        userId, isGuest, ep1.id, ep1.is_free, show.category_id
       );
 
       // Only provide HLS URL if episode is unlocked
@@ -117,7 +117,7 @@ router.get('/show/:showId', allowGuest, async (req, res, next) => {
 
     const items = await Promise.all(episodes.map(async (ep) => {
       const { is_locked, lock_reason } = await checkEpisodeAccess(
-        userId, isGuest, ep.id, ep.is_free
+        userId, isGuest, ep.id, ep.is_free, show.category_id
       );
 
       return {

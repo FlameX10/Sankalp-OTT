@@ -1,18 +1,27 @@
 import { prisma } from '../../prisma/client.js';
+import { activeMembershipWhere } from '../membership/membership.helpers.js';
 
-async function checkEpisodeAccess(userId, isGuest, episodeId, isFree) {
+async function checkEpisodeAccess(userId, isGuest, episodeId, isFree, categoryId) {
   if (isFree) return { is_locked: false, lock_reason: null };
 
   if (isGuest || !userId) {
     return { is_locked: true, lock_reason: 'login_required' };
   }
 
+  const now = new Date();
+  const membershipWhere = {
+    user_id: userId,
+    ...activeMembershipWhere(now),
+  };
+
+  if (categoryId) {
+    membershipWhere.plan = {
+      OR: [{ category_id: null }, { category_id: categoryId }],
+    };
+  }
+
   const membership = await prisma.userMembership.findFirst({
-    where: {
-      user_id: userId,
-      status: 'ACTIVE',
-      end_date: { gte: new Date() },
-    },
+    where: membershipWhere,
   });
   if (membership) return { is_locked: false, lock_reason: null };
 

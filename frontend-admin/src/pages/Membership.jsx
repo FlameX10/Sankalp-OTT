@@ -1,14 +1,23 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Plus, Edit2, Trash2, RefreshCw, Download } from 'lucide-react'
 import Modal, { FormGroup, ModalSection } from '../components/ui/Modal.jsx'
 import { Toggle, ConfirmDialog } from '../components/ui/Controls.jsx'
-import { membershipApi } from '../services/api.js'
+import { membershipApi, categoriesApi } from '../services/api.js'
 import * as XLSX from 'xlsx'
 
 function PlanModal({ open, onClose, onSave, initial, loading }) {
   const isEdit = !!initial?.id
-  const [form, setForm] = useState(initial || { name:'', price:'', currency:'INR', duration:'month', isActive:true })
+  const [categories, setCategories] = useState([])
+  const [form, setForm] = useState(initial || { name:'', price:'', currency:'INR', duration:'month', category_id:'', isActive:true })
   const upd = (k,v) => setForm(p=>({...p,[k]:v}))
+  const isLifetime = form.duration === 'lifetime'
+
+  useEffect(() => {
+    if (!open) return
+    categoriesApi.getAll()
+      .then((res) => setCategories(res.data?.data || []))
+      .catch(() => setCategories([]))
+  }, [open])
   
   useEffect(() => {
     if (initial) {
@@ -17,10 +26,13 @@ function PlanModal({ open, onClose, onSave, initial, loading }) {
         price: initial.price || '',
         currency: initial.currency || 'INR',
         duration: initial.duration || 'month',
+        category_id: initial.category_id || '',
         isActive: initial.isActive !== undefined ? initial.isActive : true,
       })
+    } else if (open) {
+      setForm({ name:'', price:'', currency:'INR', duration:'month', category_id:'', isActive:true })
     }
-  }, [initial])
+  }, [initial, open])
 
   if(!open) return null
   
@@ -28,10 +40,24 @@ function PlanModal({ open, onClose, onSave, initial, loading }) {
     <Modal open={open} onClose={onClose} title={isEdit?`Edit Plan — ${initial.name}`:'Create Membership Plan'} width={480}
       footer={<><button className="btn btn-ghost" onClick={onClose} disabled={loading}>Cancel</button><button className="btn btn-primary" onClick={() => { onSave(form); }} disabled={loading}>{loading?'...':isEdit?'Save Changes':'Create Plan'}</button></>}
     >
-      <ModalSection title="Pricing">
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+      <ModalSection title="Scope & pricing">
+        <FormGroup label="Category">
+          <select
+            className="select"
+            style={{ width:'100%' }}
+            value={form.category_id}
+            onChange={e=>upd('category_id', e.target.value)}
+            disabled={loading}
+          >
+            <option value="">All Categories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </FormGroup>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginTop:10 }}>
           <FormGroup label="Plan name *"><input className="input" placeholder="e.g. Monthly" value={form.name} onChange={e=>upd('name',e.target.value)} disabled={loading}/></FormGroup>
-          <FormGroup label="Price">
+          <FormGroup label={isLifetime ? 'One-time price' : 'Price'}>
             <div style={{ display:'flex', gap:4 }}>
               <select className="select" value={form.currency} onChange={e=>upd('currency',e.target.value)} style={{ width:60 }} disabled={loading}><option value="INR">₹</option><option value="USD">$</option></select>
               <input className="input" type="number" placeholder="149" value={form.price} onChange={e=>upd('price',+e.target.value)} disabled={loading}/>
@@ -39,10 +65,13 @@ function PlanModal({ open, onClose, onSave, initial, loading }) {
           </FormGroup>
           <FormGroup label="Period">
             <select className="select" style={{ width:'100%' }} value={form.duration} onChange={e=>upd('duration',e.target.value)} disabled={loading}>
-              <option value="week">Week</option><option value="month">Month</option><option value="year">Year</option>
+              <option value="week">Week</option><option value="month">Month</option><option value="year">Year</option><option value="lifetime">Lifetime</option>
             </select>
           </FormGroup>
         </div>
+        {isLifetime ? (
+          <div style={{ fontSize:12, color:'var(--text3)', marginTop:8 }}>One-time payment · never expires</div>
+        ) : null}
       </ModalSection>
 
       <ModalSection title="Visibility">
@@ -152,9 +181,10 @@ export default function Membership() {
     const exportData = history.map(h => ({
       'User': h.user,
       'Plan': h.plan,
+      'Category': h.category_name || 'All Categories',
       'Amount': `₹${Math.round(h.amount)}`,
       'Start Date': h.startDate ? new Date(h.startDate).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : new Date(h.date).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }),
-      'End Date': h.endDate ? new Date(h.endDate).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '—',
+      'End Date': h.is_lifetime ? 'Lifetime' : (h.endDate ? new Date(h.endDate).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '—'),
       'Status': h.status === 'ACTIVE' ? 'Active' : 'Expired',
     }))
 
@@ -180,6 +210,7 @@ export default function Membership() {
         duration: formData.duration,
         price: formData.price,
         currency: formData.currency,
+        category_id: formData.category_id || null,
       }
 
       if (selected?.id) {
@@ -240,6 +271,28 @@ export default function Membership() {
     }
   }
 
+  const groupedPlans = useMemo(() => {
+    const groups = {}
+    plans.forEach((p) => {
+      const key = p.category_id || '__all__'
+      const label = p.category_id ? (p.category_name || 'Category') : 'All Categories'
+      if (!groups[key]) groups[key] = { label, plans: [] }
+      groups[key].plans.push(p)
+    })
+    const ordered = []
+    if (groups.__all__) ordered.push(groups.__all__)
+    Object.entries(groups)
+      .filter(([k]) => k !== '__all__')
+      .sort((a, b) => a[1].label.localeCompare(b[1].label))
+      .forEach(([, g]) => ordered.push(g))
+    return ordered
+  }, [plans])
+
+  const formatPlanPeriod = (plan) => {
+    if (plan.is_lifetime || plan.duration === 'lifetime') return 'one-time'
+    return plan.duration
+  }
+
   return (
     <div className="page-enter">
       {/* Error message */}
@@ -285,18 +338,40 @@ export default function Membership() {
             <button className="btn btn-primary" onClick={() => { setSelected(null); setModal('plan-add') }} disabled={loading}><Plus size={14}/> Create plan</button>
           </div>
           <div className="grid3">
-            {plans.map(p => (
-              <div key={p.id} className="plan-card">
-                <div className="plan-name">{p.name} plan</div>
-                <div className="plan-price">{p.currency === 'INR' ? '₹' : '$'}{p.price}<span>/{p.duration}</span></div>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-                  <span className={`badge ${p.isActive?'badge-green':'badge-red'}`}>{p.isActive?'Active':'Inactive'}</span>
-                  <Toggle on={p.isActive} onChange={() => toggleActive(p.id)} disabled={loading}/>
+            {groupedPlans.map((group) => (
+              <div key={group.label} style={{ gridColumn:'1 / -1' }}>
+                <div style={{ fontSize:12, fontWeight:700, color:'var(--text3)', margin:'8px 0 12px', textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                  {group.label}
                 </div>
-                <div style={{ fontSize:12, color:'var(--text3)', fontFamily:'var(--mono)', marginBottom:12 }}>{(p.subscribers||0).toLocaleString()} subscribers</div>
-                <div style={{ display:'flex', gap:6 }}>
-                  <button className="btn btn-ghost btn-sm" style={{ flex:1 }} onClick={() => { setSelected(p); setModal('plan-edit') }} disabled={loading}><Edit2 size={11}/> Edit</button>
-                  <button className="btn btn-danger btn-sm" onClick={() => setConfirm({id:p.id,name:p.name})} disabled={loading}><Trash2 size={11}/></button>
+                <div className="grid3">
+                  {group.plans.map((p) => (
+                    <div key={p.id} className="plan-card">
+                      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+                        {p.is_all_categories ? (
+                          <span className="badge badge-blue" style={{ fontSize:10 }}>All Categories</span>
+                        ) : (
+                          <span className="badge badge-gray" style={{ fontSize:10 }}>{p.category_name}</span>
+                        )}
+                        {(p.is_lifetime || p.duration === 'lifetime') ? (
+                          <span className="badge badge-purple" style={{ fontSize:10 }}>Lifetime</span>
+                        ) : null}
+                      </div>
+                      <div className="plan-name">{p.name} plan</div>
+                      <div className="plan-price">
+                        {p.currency === 'INR' ? '₹' : '$'}{p.price}
+                        <span>/{formatPlanPeriod(p)}</span>
+                      </div>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                        <span className={`badge ${p.isActive?'badge-green':'badge-red'}`}>{p.isActive?'Active':'Inactive'}</span>
+                        <Toggle on={p.isActive} onChange={() => toggleActive(p.id)} disabled={loading}/>
+                      </div>
+                      <div style={{ fontSize:12, color:'var(--text3)', fontFamily:'var(--mono)', marginBottom:12 }}>{(p.subscribers||0).toLocaleString()} subscribers</div>
+                      <div style={{ display:'flex', gap:6 }}>
+                        <button className="btn btn-ghost btn-sm" style={{ flex:1 }} onClick={() => { setSelected(p); setModal('plan-edit') }} disabled={loading}><Edit2 size={11}/> Edit</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => setConfirm({id:p.id,name:p.name})} disabled={loading}><Trash2 size={11}/></button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
@@ -319,12 +394,12 @@ export default function Membership() {
           </div>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>User</th><th>Plan</th><th>Amount</th><th>Start Date</th><th>End Date</th><th>Status</th></tr></thead>
+              <thead><tr><th>User</th><th>Plan</th><th>Category</th><th>Amount</th><th>Start Date</th><th>End Date</th><th>Status</th></tr></thead>
               <tbody>
                 {historyLoading ? (
-                  <tr><td colSpan="6" style={{ textAlign:'center', color:'var(--text3)', padding:'20px' }}>Loading...</td></tr>
+                  <tr><td colSpan="7" style={{ textAlign:'center', color:'var(--text3)', padding:'20px' }}>Loading...</td></tr>
                 ) : history.length === 0 ? (
-                  <tr><td colSpan="6" style={{ textAlign:'center', color:'var(--text3)', padding:'20px' }}>No subscription history</td></tr>
+                  <tr><td colSpan="7" style={{ textAlign:'center', color:'var(--text3)', padding:'20px' }}>No subscription history</td></tr>
                 ) : (
                   (() => {
                     const PLAN_COLORS = [
@@ -346,9 +421,10 @@ export default function Membership() {
                         <tr key={h.id}>
                           <td style={{ fontWeight:500 }}>{h.user}</td>
                           <td><span style={{ background:pc.bg, color:pc.color, padding:'2px 10px', borderRadius:99, fontSize:11, fontWeight:600, letterSpacing:'0.03em', display:'inline-block' }}>{h.plan}</span></td>
+                          <td style={{ fontSize:12, color:'var(--text3)' }}>{h.category_name || 'All Categories'}</td>
                           <td style={{ fontFamily:'var(--mono)' }}>₹{Math.round(h.amount).toLocaleString()}</td>
                           <td style={{ color:'var(--text3)', fontSize:12 }}>{h.startDate ? new Date(h.startDate).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : new Date(h.date).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' })}</td>
-                          <td style={{ color:'var(--text3)', fontSize:12 }}>{h.endDate ? new Date(h.endDate).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '—'}</td>
+                          <td style={{ color:'var(--text3)', fontSize:12 }}>{h.is_lifetime ? 'Lifetime' : (h.endDate ? new Date(h.endDate).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '—')}</td>
                           <td><span className={`badge ${h.status==='ACTIVE'?'badge-green':'badge-red'}`}>{h.status === 'ACTIVE' ? 'Active' : 'Expired'}</span></td>
                         </tr>
                       )

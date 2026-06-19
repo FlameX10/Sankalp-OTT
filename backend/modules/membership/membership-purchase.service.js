@@ -1,11 +1,22 @@
 import { prisma } from '../../prisma/client.js';
+import {
+  activeMembershipWhere,
+  formatMembershipResponse,
+  isLifetimePlan,
+  membershipPlanInclude,
+} from './membership.helpers.js';
 
 /**
  * Add plan duration to a start date (supports seed values: weekly, monthly, annual).
+ * Returns null for lifetime plans.
  */
 export function addPlanDuration(startDate, durationRaw) {
-  const d = new Date(startDate);
   const duration = String(durationRaw || '').toLowerCase();
+  if (duration === 'lifetime') {
+    return null;
+  }
+
+  const d = new Date(startDate);
 
   if (duration === 'weekly' || duration === 'week') {
     d.setDate(d.getDate() + 7);
@@ -20,13 +31,41 @@ export function addPlanDuration(startDate, durationRaw) {
   return d;
 }
 
+function lifetimeScopeCovers(membership, targetCategoryId) {
+  const scopeCategoryId = membership.plan.category_id;
+  if (scopeCategoryId === null) {
+    return true;
+  }
+  return scopeCategoryId === targetCategoryId;
+}
+
+function coverageBlockMessage(membership) {
+  const scopeCategoryId = membership.plan.category_id;
+  if (scopeCategoryId === null) {
+    return 'You already have lifetime access to All Categories';
+  }
+  const categoryName = membership.plan.category?.name || 'this category';
+  return `You already have lifetime access to ${categoryName}`;
+}
+
+async function fetchActiveMembershipsForUser(userId, now) {
+  return prisma.userMembership.findMany({
+    where: {
+      user_id: userId,
+      ...activeMembershipWhere(now),
+    },
+    include: membershipPlanInclude,
+  });
+}
+
 /**
  * Simulated membership purchase (no payment gateway).
- * Grants MEMBER plan and active UserMembership for the plan duration.
+ * Applies category scope and purchase precedence rules (C).
  */
 export async function simulateMembershipPurchase(userId, planId) {
   const plan = await prisma.membershipPlan.findFirst({
     where: { id: planId, is_active: true },
+    include: { category: { select: { name: true } } },
   });
 
   if (!plan) {
@@ -34,31 +73,53 @@ export async function simulateMembershipPurchase(userId, planId) {
   }
 
   const now = new Date();
+  const purchaseScopeCategoryId = plan.category_id;
+  const purchaseIsLifetime = isLifetimePlan(plan);
 
-  const activeMembership = await prisma.userMembership.findFirst({
-    where: {
-      user_id: userId,
-      status: 'ACTIVE',
-      end_date: { gte: now },
-    },
-    orderBy: { end_date: 'desc' },
-  });
+  const activeMemberships = await fetchActiveMembershipsForUser(userId, now);
 
-  const extendFrom = activeMembership?.end_date > now ? activeMembership.end_date : now;
-  const startDate = activeMembership?.start_date && activeMembership.end_date > now
-    ? activeMembership.start_date
-    : now;
-  const endDate = addPlanDuration(extendFrom, plan.duration);
+  const blockingLifetime = activeMemberships.find(
+    (m) => isLifetimePlan(m.plan) && lifetimeScopeCovers(m, purchaseScopeCategoryId)
+  );
+  if (blockingLifetime) {
+    return {
+      ok: false,
+      status: 409,
+      message: coverageBlockMessage(blockingLifetime),
+    };
+  }
+
+  const startDate = now;
+  const endDate = purchaseIsLifetime ? null : addPlanDuration(now, plan.duration);
 
   const result = await prisma.$transaction(async (tx) => {
-    await tx.userMembership.updateMany({
-      where: {
-        user_id: userId,
-        status: 'ACTIVE',
-        end_date: { gte: now },
-      },
-      data: { status: 'EXPIRED' },
-    });
+    const expireWhere = {
+      user_id: userId,
+      ...activeMembershipWhere(now),
+    };
+
+    if (purchaseScopeCategoryId === null && purchaseIsLifetime) {
+      await tx.userMembership.updateMany({
+        where: expireWhere,
+        data: { status: 'EXPIRED' },
+      });
+    } else if (purchaseScopeCategoryId === null) {
+      await tx.userMembership.updateMany({
+        where: {
+          ...expireWhere,
+          end_date: { not: null },
+        },
+        data: { status: 'EXPIRED' },
+      });
+    } else {
+      await tx.userMembership.updateMany({
+        where: {
+          ...expireWhere,
+          plan: { category_id: purchaseScopeCategoryId },
+        },
+        data: { status: 'EXPIRED' },
+      });
+    }
 
     const payment = await tx.paymentTransaction.create({
       data: {
@@ -71,7 +132,7 @@ export async function simulateMembershipPurchase(userId, planId) {
       },
     });
 
-    const membership = await tx.userMembership.create({
+    await tx.userMembership.create({
       data: {
         user_id: userId,
         plan_id: plan.id,
@@ -80,12 +141,21 @@ export async function simulateMembershipPurchase(userId, planId) {
         end_date: endDate,
         status: 'ACTIVE',
       },
-      include: { plan: true },
     });
+
+    const remainingActive = await tx.userMembership.findMany({
+      where: {
+        user_id: userId,
+        ...activeMembershipWhere(now),
+      },
+      include: membershipPlanInclude,
+    });
+
+    const hasAnyActive = remainingActive.length > 0;
 
     await tx.user.update({
       where: { id: userId },
-      data: { plan: 'MEMBER' },
+      data: { plan: hasAnyActive ? 'MEMBER' : 'FREE' },
     });
 
     const user = await tx.user.findUnique({
@@ -93,23 +163,19 @@ export async function simulateMembershipPurchase(userId, planId) {
       select: { coins: true, plan: true },
     });
 
-    return { membership, user, payment };
+    return { memberships: remainingActive, user, payment };
   });
+
+  const memberships = result.memberships.map(formatMembershipResponse);
+  const hasAllAccess = result.memberships.some((m) => m.plan.category_id === null);
 
   return {
     ok: true,
     data: {
       plan: result.user.plan,
       coins: result.user.coins ?? 0,
-      membership: {
-        id: result.membership.id,
-        plan_id: result.membership.plan_id,
-        plan_name: result.membership.plan.name,
-        duration: result.membership.plan.duration,
-        start_date: result.membership.start_date,
-        end_date: result.membership.end_date,
-        status: result.membership.status,
-      },
+      memberships,
+      has_all_access: hasAllAccess,
     },
     message: 'Membership activated',
   };

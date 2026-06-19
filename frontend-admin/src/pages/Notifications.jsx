@@ -9,7 +9,7 @@ const AUDIENCE_MAP = {
   'Paid members': 'paid',
   'Weekly plan': 'weekly-plan',
   'Monthly plan': 'monthly-plan',
-  'Annual plan': 'annual-plan',
+  'Lifetime plan': 'lifetime-plan',
 }
 
 const NOTIF_TYPES = [

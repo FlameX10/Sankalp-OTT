@@ -1,5 +1,6 @@
 import { prisma } from '../../prisma/client.js';
 import { getSignedEpisodeHlsPath } from '../../utils/hls-signed-url.js';
+import { activeMembershipWhere } from '../membership/membership.helpers.js';
 
 function buildEpisodeHlsPath(episode) {
   return getSignedEpisodeHlsPath(episode);
@@ -32,7 +33,7 @@ export async function unlockEpisodeForUser(userId, episodeId) {
       coin_cost: true,
       status: true,
       hls_master_url: true,
-      show: { select: { title: true } },
+      show: { select: { title: true, category_id: true } },
     },
   });
 
@@ -45,6 +46,9 @@ export async function unlockEpisodeForUser(userId, episodeId) {
   if (!episode.coin_cost || episode.coin_cost <= 0) {
     return { ok: false, status: 400, data: null, message: 'Episode has no coin cost' };
   }
+
+  const categoryId = episode.show?.category_id;
+  const now = new Date();
 
   const existingAccess = await prisma.episodeAccess.findUnique({
     where: { idx_ea_user_ep: { user_id: userId, episode_id: episodeId } },
@@ -64,8 +68,10 @@ export async function unlockEpisodeForUser(userId, episodeId) {
   const membership = await prisma.userMembership.findFirst({
     where: {
       user_id: userId,
-      status: 'ACTIVE',
-      end_date: { gte: new Date() },
+      ...activeMembershipWhere(now),
+      plan: {
+        OR: [{ category_id: null }, { category_id: categoryId }],
+      },
     },
   });
   if (membership) {

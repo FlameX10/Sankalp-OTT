@@ -63,7 +63,8 @@ export default function PromoFlowGate({ children }) {
   const accessToken = useSelector((s) => s.auth?.accessToken);
   const userId = useSelector((s) => s.auth?.userId);
   const plan = useSelector((s) => s.auth?.plan);
-  const membership = useSelector((s) => s.auth?.membership);
+  const memberships = useSelector((s) => s.auth?.memberships) || [];
+  const hasAllAccess = useSelector((s) => s.auth?.has_all_access);
 
   const [step, setStep] = useState(null);
   const [checkinStatus, setCheckinStatus] = useState(null);
@@ -85,14 +86,14 @@ export default function PromoFlowGate({ children }) {
   //   plan/membership change → refreshMembershipProfile new ref
   //   → runPromoFlow new ref → useEffect re-fires → runningRef bypassed → loop
   const planRef = useRef(plan);
-  const membershipRef = useRef(membership);
+  const membershipRef = useRef(memberships);
   const accessTokenRef = useRef(accessToken);
 
   userIdRef.current = userId;
   bannersRef.current = banners;
   announcementsRef.current = announcements;
   planRef.current = plan;
-  membershipRef.current = membership;
+  membershipRef.current = memberships;
   accessTokenRef.current = accessToken;
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -125,7 +126,7 @@ export default function PromoFlowGate({ children }) {
     // useUserDataSync has already synced these from the backend.
     return Promise.resolve({
       plan: planRef.current,
-      membership: membershipRef.current,
+      memberships: membershipRef.current,
     });
   }, [dispatch]); // dispatch is stable; plan/membership accessed via refs
 
@@ -205,7 +206,7 @@ export default function PromoFlowGate({ children }) {
       const profile = await refreshMembershipProfile();
       const reminder = getMembershipExpiryReminder({
         plan: profile.plan,
-        membership: profile.membership,
+        memberships: profile.memberships,
       });
       if (
         reminder &&

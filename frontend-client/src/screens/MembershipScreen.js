@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -20,6 +20,10 @@ import {
   formatPlanPrice,
   getDurationLabel,
   formatMembershipEnd,
+  getPlanUnlockScopeLabel,
+  findBlockingLifetimeMembership,
+  blockingLifetimeMessage,
+  isLifetimePlan,
 } from '../components/membership/membershipApi';
 import { theme } from '../constants/theme';
 import { ROUTES } from '../constants/routes';
@@ -39,17 +43,19 @@ export default function MembershipScreen({ navigation }) {
   const dispatch = useDispatch();
   const accessToken = useSelector((s) => s.auth?.accessToken);
   const userPlan = useSelector((s) => s.auth?.plan);
-  const membership = useSelector((s) => s.auth?.membership);
+  const memberships = useSelector((s) => s.auth?.memberships) || [];
+  const hasAllAccess = useSelector((s) => s.auth?.has_all_access);
 
   const [plans, setPlans] = useState([]);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  const [activeCategoryTab, setActiveCategoryTab] = useState('__all__');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [purchaseError, setPurchaseError] = useState(null);
 
-  const isMember = userPlan === 'MEMBER' && membership?.end_date;
+  const isMember = userPlan === 'MEMBER' && memberships.length > 0;
   const returningHomeRef = useRef(false);
 
   const backToHome = !!route.params?.backToHome;
@@ -104,9 +110,6 @@ export default function MembershipScreen({ navigation }) {
       setError(null);
       const fetchedPlans = await fetchMembershipPlans();
       setPlans(Array.isArray(fetchedPlans) ? fetchedPlans : []);
-      if (fetchedPlans.length > 0) {
-        setSelectedPlan((prev) => prev ?? fetchedPlans[0].id);
-      }
     } catch (err) {
       setError(
         err?.response?.data?.message || err?.message || 'Failed to load membership plans'
@@ -121,11 +124,73 @@ export default function MembershipScreen({ navigation }) {
     loadPlans();
   }, [loadPlans]);
 
+  const planGroups = useMemo(() => {
+    const allPlans = plans.filter((p) => !p.category_id);
+    const byCategory = {};
+    plans
+      .filter((p) => p.category_id)
+      .forEach((p) => {
+        if (!byCategory[p.category_id]) {
+          byCategory[p.category_id] = {
+            id: p.category_id,
+            name: p.category_name || 'Category',
+            plans: [],
+          };
+        }
+        byCategory[p.category_id].plans.push(p);
+      });
+    return {
+      all: allPlans,
+      categories: Object.values(byCategory).sort((a, b) => a.name.localeCompare(b.name)),
+    };
+  }, [plans]);
+
+  const categoryTabs = useMemo(() => {
+    const tabs = [];
+    if (planGroups.all.length > 0) {
+      tabs.push({ id: '__all__', label: 'All Categories' });
+    }
+    planGroups.categories.forEach((g) => tabs.push({ id: g.id, label: g.name }));
+    return tabs;
+  }, [planGroups]);
+
+  const visiblePlans = useMemo(() => {
+    if (activeCategoryTab === '__all__') return planGroups.all;
+    const group = planGroups.categories.find((g) => g.id === activeCategoryTab);
+    return group?.plans || [];
+  }, [activeCategoryTab, planGroups]);
+
+  useEffect(() => {
+    if (categoryTabs.length === 0) return;
+    if (!categoryTabs.some((t) => t.id === activeCategoryTab)) {
+      setActiveCategoryTab(categoryTabs[0].id);
+    }
+  }, [categoryTabs, activeCategoryTab]);
+
+  useEffect(() => {
+    if (visiblePlans.length === 0) {
+      setSelectedPlan(null);
+      return;
+    }
+    if (!visiblePlans.some((p) => p.id === selectedPlan)) {
+      setSelectedPlan(visiblePlans[0].id);
+    }
+  }, [visiblePlans, selectedPlan]);
+
   const selectedPlanData = plans.find((p) => p.id === selectedPlan);
+  const blockingLifetime = selectedPlanData
+    ? findBlockingLifetimeMembership(memberships, selectedPlanData)
+    : null;
+  const blockMessage = blockingLifetimeMessage(blockingLifetime);
 
   const openConfirm = () => {
     if (!accessToken) return;
     if (!selectedPlan) return;
+    if (blockMessage) {
+      setPurchaseError(blockMessage);
+      setConfirmOpen(true);
+      return;
+    }
     setPurchaseError(null);
     setConfirmOpen(true);
   };
@@ -144,16 +209,21 @@ export default function MembershipScreen({ navigation }) {
       const patch = {
         plan: data?.plan ?? 'MEMBER',
         coins: data?.coins,
-        membership: data?.membership ?? null,
+        memberships: data?.memberships ?? [],
+        has_all_access: data?.has_all_access ?? false,
       };
       dispatch(patchUserProfile(patch));
       await authService.patchUserDataInStore(patch);
       setConfirmOpen(false);
+      const purchased = data?.memberships?.find((m) => m.plan_id === selectedPlan);
+      const scope = purchased?.category_name
+        ? purchased.category_name
+        : getPlanUnlockScopeLabel(selectedPlanData);
       Alert.alert(
         'Membership active',
-        data?.membership?.end_date
-          ? `All locked episodes are unlocked until ${formatMembershipEnd(data.membership.end_date)}.`
-          : 'Your membership is now active.'
+        purchased?.end_date
+          ? `${scope} dramas are unlocked until ${formatMembershipEnd(purchased.end_date)}.`
+          : `You now have lifetime access to ${scope}.`
       );
     } catch (err) {
       setPurchaseError(
@@ -206,26 +276,63 @@ export default function MembershipScreen({ navigation }) {
           <Text style={styles.heroTitle}>Join Membership</Text>
           {isMember ? (
             <Text style={styles.heroSub}>
-              Active until {formatMembershipEnd(membership.end_date)}
-              {membership.plan_name ? ` · ${membership.plan_name}` : ''}
+              {memberships.length} active membership{memberships.length === 1 ? '' : 's'}
+              {hasAllAccess ? ' · All categories' : ''}
             </Text>
           ) : (
-            <Text style={styles.heroSub}>Unlock all episodes while your plan is active</Text>
+            <Text style={styles.heroSub}>Unlock paid episodes for the categories you choose</Text>
           )}
         </View>
 
         {isMember ? (
           <View style={styles.activeBanner}>
             <Ionicons name="checkmark-circle" size={22} color="#4CD964" />
-            <Text style={styles.activeBannerText}>
-              You are a member — locked episodes play without coins until{' '}
-              {formatMembershipEnd(membership.end_date)}. Extend below anytime.
-            </Text>
+            <View style={{ flex: 1 }}>
+              {memberships.map((m) => (
+                <Text key={m.id} style={styles.activeBannerText}>
+                  {m.plan_name || 'Membership'}
+                  {m.category_name ? ` · ${m.category_name}` : ' · All categories'}
+                  {' — '}
+                  {m.end_date
+                    ? `until ${formatMembershipEnd(m.end_date)}`
+                    : 'Lifetime access'}
+                </Text>
+              ))}
+            </View>
           </View>
         ) : null}
 
+        {categoryTabs.length > 1 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.categoryTabs}
+            contentContainerStyle={styles.categoryTabsContent}
+          >
+            {categoryTabs.map((tab) => (
+              <Pressable
+                key={tab.id}
+                style={[
+                  styles.categoryTab,
+                  activeCategoryTab === tab.id && styles.categoryTabActive,
+                ]}
+                onPress={() => setActiveCategoryTab(tab.id)}
+              >
+                <Text
+                  style={[
+                    styles.categoryTabText,
+                    activeCategoryTab === tab.id && styles.categoryTabTextActive,
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : null}
+
         <View style={styles.plansSection}>
-          {plans.map((plan) => (
+          {visiblePlans.map((plan) => (
             <Pressable
               key={plan.id}
               style={[
@@ -247,18 +354,29 @@ export default function MembershipScreen({ navigation }) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.planName}>{plan.name} Membership</Text>
-                  <Text style={styles.planPrice}>
-                    {formatPlanPrice(plan.price, plan.currency)} /{getDurationLabel(plan.duration)}
+                  <Text style={styles.planScope}>
+                    {plan.category_id ? plan.category_name : 'All categories'}
                   </Text>
-                  {(plan.duration === 'weekly' || plan.duration === 'week') && (
+                  <Text style={styles.planPrice}>
+                    {formatPlanPrice(plan.price, plan.currency)}
+                    {isLifetimePlan(plan)
+                      ? ' · one-time payment'
+                      : ` /${getDurationLabel(plan.duration)}`}
+                  </Text>
+                  {isLifetimePlan(plan) ? (
+                    <Text style={styles.planDetail}>Lifetime access · never expires</Text>
+                  ) : (plan.duration === 'weekly' || plan.duration === 'week') ? (
                     <Text style={styles.planDetail}>
                       {formatPlanPrice(plan.price, plan.currency)} per week
                     </Text>
-                  )}
+                  ) : null}
                 </View>
               </View>
             </Pressable>
           ))}
+          {visiblePlans.length === 0 ? (
+            <Text style={styles.emptyPlansText}>No plans in this category yet.</Text>
+          ) : null}
         </View>
 
         <Text style={styles.whyTitle}>Why Join?</Text>
@@ -290,7 +408,11 @@ export default function MembershipScreen({ navigation }) {
           <Text style={styles.joinBtnText}>
             {isMember ? 'Extend Membership' : 'Join Now'}
           </Text>
-          <Text style={styles.joinBtnSub}>Simulated payment · Cancel anytime</Text>
+          <Text style={styles.joinBtnSub}>
+            {isLifetimePlan(selectedPlanData)
+              ? 'One-time payment'
+              : 'Simulated payment · Cancel anytime'}
+          </Text>
         </Pressable>
       </View>
 
@@ -311,16 +433,24 @@ export default function MembershipScreen({ navigation }) {
                     {selectedPlanData.name} Membership
                   </Text>
                   <Text style={styles.confirmPlanPrice}>
-                    {formatPlanPrice(selectedPlanData.price, selectedPlanData.currency)} /{' '}
-                    {getDurationLabel(selectedPlanData.duration)}
+                    {formatPlanPrice(selectedPlanData.price, selectedPlanData.currency)}
+                    {isLifetimePlan(selectedPlanData)
+                      ? ' · one-time payment'
+                      : ` / ${getDurationLabel(selectedPlanData.duration)}`}
                   </Text>
                   <Text style={styles.confirmPlanHint}>
-                    Unlocks all paid episodes for the plan duration
+                    Unlocks {getPlanUnlockScopeLabel(selectedPlanData)} paid episodes
+                    {isLifetimePlan(selectedPlanData)
+                      ? ' for life'
+                      : ' for the plan duration'}
                   </Text>
                 </View>
               </View>
             ) : null}
-            {purchaseError ? (
+            {blockMessage ? (
+              <Text style={styles.purchaseError}>{blockMessage}</Text>
+            ) : null}
+            {purchaseError && !blockMessage ? (
               <Text style={styles.purchaseError}>{purchaseError}</Text>
             ) : null}
             <View style={styles.confirmActions}>
@@ -328,9 +458,9 @@ export default function MembershipScreen({ navigation }) {
                 <Text style={styles.btnSecondaryText}>Cancel</Text>
               </Pressable>
               <Pressable
-                style={styles.btnPrimary}
+                style={[styles.btnPrimary, blockMessage && styles.btnPrimaryDisabled]}
                 onPress={onConfirmPurchase}
-                disabled={purchasing}
+                disabled={purchasing || !!blockMessage}
               >
                 {purchasing ? (
                   <ActivityIndicator color="#fff" />
@@ -416,7 +546,29 @@ const styles = StyleSheet.create({
   planRadioActive: { borderColor: theme.crimson, backgroundColor: theme.crimson },
   planName: { color: theme.white, fontSize: 16, fontWeight: '700', marginBottom: 4 },
   planPrice: { color: theme.white, fontSize: 18, fontWeight: '800' },
-  planDetail: { color: theme.gray, fontSize: 11, marginTop: 4, lineHeight: 16 },
+  planScope: { color: theme.gray, fontSize: 12, marginBottom: 4 },
+  categoryTabs: { maxHeight: 44, marginTop: 8 },
+  categoryTabsContent: { paddingHorizontal: 16, gap: 8 },
+  categoryTab: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+  },
+  categoryTabActive: {
+    borderColor: theme.crimson,
+    backgroundColor: 'rgba(255, 45, 85, 0.12)',
+  },
+  categoryTabText: { color: theme.gray, fontSize: 12, fontWeight: '600' },
+  categoryTabTextActive: { color: theme.white },
+  emptyPlansText: {
+    color: theme.gray,
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
   whyTitle: {
     fontSize: 22,
     fontWeight: '800',
@@ -491,6 +643,8 @@ const styles = StyleSheet.create({
   confirmActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
   btnSecondary: { paddingVertical: 12, paddingHorizontal: 16 },
   btnSecondaryText: { color: theme.gray, fontSize: 16, fontWeight: '600' },
+  planDetail: { color: theme.gray, fontSize: 11, marginTop: 4, lineHeight: 16 },
+  btnPrimaryDisabled: { opacity: 0.45 },
   btnPrimary: {
     backgroundColor: theme.crimson,
     paddingVertical: 12,

@@ -1,6 +1,7 @@
 import { getPrismaClient } from '../../config/db.js';
 import logger from '../../config/logger.js';
 import { ApiError } from '../../utils/ApiError.js';
+import { activeMembershipWhere } from '../membership/membership.helpers.js';
 
 const prisma = getPrismaClient();
 
@@ -272,6 +273,8 @@ export async function deleteNotificationBroadcast(title, type, sent_at) {
 
 // Helper function to filter users by audience
 function getUserFilterByAudience(audience) {
+  const activeMembershipFilter = activeMembershipWhere();
+
   switch (audience) {
     case 'free':
       return {
@@ -290,7 +293,7 @@ function getUserFilterByAudience(audience) {
         where: {
           memberships: {
             some: {
-              status: 'ACTIVE',
+              ...activeMembershipFilter,
               plan: {
                 duration: 'weekly',
               },
@@ -303,7 +306,7 @@ function getUserFilterByAudience(audience) {
         where: {
           memberships: {
             some: {
-              status: 'ACTIVE',
+              ...activeMembershipFilter,
               plan: {
                 duration: 'monthly',
               },
@@ -316,9 +319,23 @@ function getUserFilterByAudience(audience) {
         where: {
           memberships: {
             some: {
-              status: 'ACTIVE',
+              ...activeMembershipFilter,
               plan: {
                 duration: 'annual',
+              },
+            },
+          },
+        },
+      };
+    case 'lifetime-plan':
+      return {
+        where: {
+          memberships: {
+            some: {
+              ...activeMembershipFilter,
+              end_date: null,
+              plan: {
+                duration: 'lifetime',
               },
             },
           },

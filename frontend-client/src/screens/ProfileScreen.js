@@ -119,7 +119,8 @@ export default function ProfileScreen({ navigation }) {
   const name = useSelector((state) => state.auth.name);
   const coins = useSelector((state) => state.auth.coins);
   const plan = useSelector((state) => state.auth.plan);
-  const membership = useSelector((state) => state.auth.membership);
+  const memberships = useSelector((state) => state.auth.memberships) || [];
+  const hasAllAccess = useSelector((state) => state.auth.has_all_access);
   const isPaid = plan && plan !== 'FREE';
   const dispatch = useDispatch();
   const { logout: logoutState } = useSelector((state) => state.auth);
@@ -223,9 +224,13 @@ export default function ProfileScreen({ navigation }) {
               <Text style={styles.loginText}>{name || 'User'}</Text>
               <Ionicons name="chevron-forward" size={16} color={theme.white} />
             </View>
-            {isPaid && membership?.end_date ? (
+            {isPaid && memberships.length > 0 ? (
               <Text style={styles.membershipEndText}>
-                Member until {formatMembershipEnd(membership.end_date)}
+                {memberships.map((m) => {
+                  const scope = m.category_name ? ` · ${m.category_name}` : '';
+                  if (!m.end_date) return `Lifetime${scope}`;
+                  return `Until ${formatMembershipEnd(m.end_date)}${scope}`;
+                }).join('  ·  ')}
               </Text>
             ) : null}
           </View>

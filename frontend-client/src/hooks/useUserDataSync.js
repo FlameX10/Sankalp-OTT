@@ -49,7 +49,8 @@ export function useUserDataSync() {
         const patch = {};
         if (typeof user?.coins === 'number') patch.coins = user.coins;
         if (user?.plan !== undefined) patch.plan = user.plan;
-        if (user?.membership !== undefined) patch.membership = user.membership;
+        if (user?.memberships !== undefined) patch.memberships = user.memberships;
+        if (user?.has_all_access !== undefined) patch.has_all_access = user.has_all_access;
 
         if (Object.keys(patch).length > 0) {
           dispatch(patchUserProfile(patch));

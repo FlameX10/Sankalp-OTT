@@ -29,6 +29,11 @@ import { ApiError } from '../../utils/ApiError.js';
 import logger from '../../config/logger.js';
 import { getPrismaClient } from '../../config/db.js';
 import { getAdminProfile } from '../admin/subadmin.service.js';
+import {
+  activeMembershipWhere,
+  formatMembershipResponse,
+  membershipPlanInclude,
+} from '../membership/membership.helpers.js';
 
 const prisma = getPrismaClient();
 
@@ -500,26 +505,22 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
       throw new ApiError(404, 'User not found');
     }
 
-    const activeMembership = await prisma.userMembership.findFirst({
+    const activeMemberships = await prisma.userMembership.findMany({
       where: {
         user_id: userId,
-        status: 'ACTIVE',
-        end_date: { gte: new Date() },
+        ...activeMembershipWhere(new Date()),
       },
-      orderBy: { end_date: 'desc' },
-      include: { plan: { select: { name: true, duration: true } } },
+      include: membershipPlanInclude,
+      orderBy: [{ end_date: 'asc' }, { created_at: 'desc' }],
     });
+
+    const memberships = activeMemberships.map(formatMembershipResponse);
+    const hasAllAccess = activeMemberships.some((m) => m.plan.category_id === null);
 
     const profile = {
       ...user,
-      membership: activeMembership
-        ? {
-            plan_name: activeMembership.plan.name,
-            duration: activeMembership.plan.duration,
-            end_date: activeMembership.end_date,
-            status: activeMembership.status,
-          }
-        : null,
+      memberships,
+      has_all_access: hasAllAccess,
     };
 
     return res.json(new ApiResponse(200, profile, 'User profile fetched'));

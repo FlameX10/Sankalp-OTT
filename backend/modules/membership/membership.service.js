@@ -1,5 +1,38 @@
 import { prisma } from '../../prisma/client.js';
 import { AppError } from '../../middleware/error.middleware.js';
+import { activeMembershipWhere, isLifetimePlan } from './membership.helpers.js';
+
+const VALID_DURATIONS = [
+  'week',
+  'weekly',
+  'month',
+  'monthly',
+  'year',
+  'yearly',
+  'annual',
+  'lifetime',
+];
+
+function mapPlanRecord(p, extra = {}) {
+  const lifetime = isLifetimePlan(p);
+  return {
+    id: p.id,
+    name: p.name,
+    duration: p.duration,
+    price: parseFloat(p.price),
+    currency: p.currency,
+    isActive: p.is_active,
+    category_id: p.category_id ?? null,
+    category_name: p.category?.name ?? (p.category_id ? null : 'All Categories'),
+    is_lifetime: lifetime,
+    is_all_categories: p.category_id == null,
+    ...extra,
+  };
+}
+
+const planWithCategoryInclude = {
+  category: { select: { name: true } },
+};
 
 /**
  * =====================================================
@@ -16,17 +49,11 @@ export async function getAllActivePlans() {
   try {
     const plans = await prisma.membershipPlan.findMany({
       where: { is_active: true },
-      orderBy: { created_at: 'asc' },
+      include: planWithCategoryInclude,
+      orderBy: [{ category_id: 'asc' }, { created_at: 'asc' }],
     });
 
-    return plans.map(p => ({
-      id: p.id,
-      name: p.name,
-      duration: p.duration,
-      price: parseFloat(p.price),
-      currency: p.currency,
-      isActive: p.is_active,
-    }));
+    return plans.map((p) => mapPlanRecord(p));
   } catch (error) {
     throw error;
   }
@@ -39,29 +66,23 @@ export async function getAllActivePlans() {
 export async function getAllPlans() {
   try {
     const plans = await prisma.membershipPlan.findMany({
-      orderBy: { created_at: 'asc' },
+      include: planWithCategoryInclude,
+      orderBy: [{ category_id: 'asc' }, { created_at: 'asc' }],
     });
 
-    // Get subscriber count for each plan
     const plansWithStats = await Promise.all(
       plans.map(async (p) => {
         const subscriberCount = await prisma.userMembership.count({
           where: {
             plan_id: p.id,
-            status: 'ACTIVE',
+            ...activeMembershipWhere(),
           },
         });
 
-        return {
-          id: p.id,
-          name: p.name,
-          duration: p.duration,
-          price: parseFloat(p.price),
-          currency: p.currency,
-          isActive: p.is_active,
+        return mapPlanRecord(p, {
           subscribers: subscriberCount,
           createdAt: p.created_at,
-        };
+        });
       })
     );
 
@@ -78,21 +99,14 @@ export async function getPlanById(planId) {
   try {
     const plan = await prisma.membershipPlan.findUnique({
       where: { id: planId },
+      include: planWithCategoryInclude,
     });
 
     if (!plan) {
       throw new AppError('Plan not found', 404);
     }
 
-    return {
-      id: plan.id,
-      name: plan.name,
-      duration: plan.duration,
-      price: parseFloat(plan.price),
-      currency: plan.currency,
-      isActive: plan.is_active,
-      createdAt: plan.created_at,
-    };
+    return mapPlanRecord(plan, { createdAt: plan.created_at });
   } catch (error) {
     throw error;
   }
@@ -104,10 +118,9 @@ export async function getPlanById(planId) {
  */
 export async function createPlan(data) {
   try {
-    const { name, duration, price, currency = 'INR' } = data;
+    const { name, duration, price, currency = 'INR', category_id = null } = data;
 
-    // Validation
-    if (!name || !duration || !price) {
+    if (!name || !duration || price === undefined || price === null || price === '') {
       throw new AppError('Missing required fields: name, duration, price', 400);
     }
 
@@ -115,32 +128,30 @@ export async function createPlan(data) {
       throw new AppError('Price must be a valid positive number', 400);
     }
 
-    const validDurations = ['week', 'month', 'year'];
-    if (!validDurations.includes(duration)) {
-      throw new AppError(`Duration must be one of: ${validDurations.join(', ')}`, 400);
+    if (!VALID_DURATIONS.includes(String(duration).toLowerCase())) {
+      throw new AppError(`Duration must be one of: ${VALID_DURATIONS.join(', ')}`, 400);
     }
 
-    // Create plan
+    if (category_id) {
+      const category = await prisma.category.findUnique({ where: { id: category_id } });
+      if (!category) {
+        throw new AppError('Category not found', 404);
+      }
+    }
+
     const plan = await prisma.membershipPlan.create({
       data: {
         name: name.trim(),
-        duration,
+        duration: String(duration).toLowerCase(),
         price: parseFloat(price),
         currency,
+        category_id: category_id || null,
         is_active: true,
       },
+      include: planWithCategoryInclude,
     });
 
-    return {
-      id: plan.id,
-      name: plan.name,
-      duration: plan.duration,
-      price: parseFloat(plan.price),
-      currency: plan.currency,
-      isActive: plan.is_active,
-      subscribers: 0,
-      createdAt: plan.created_at,
-    };
+    return mapPlanRecord(plan, { subscribers: 0, createdAt: plan.created_at });
   } catch (error) {
     throw error;
   }
@@ -160,50 +171,49 @@ export async function updatePlan(planId, data) {
       throw new AppError('Plan not found', 404);
     }
 
-    const { name, duration, price, isActive } = data;
+    const { name, duration, price, isActive, category_id } = data;
 
-    // Validation
     if (price !== undefined && (isNaN(price) || price <= 0)) {
       throw new AppError('Price must be a valid positive number', 400);
     }
 
     if (duration) {
-      const validDurations = ['week', 'month', 'year'];
-      if (!validDurations.includes(duration)) {
-        throw new AppError(`Duration must be one of: ${validDurations.join(', ')}`, 400);
+      if (!VALID_DURATIONS.includes(String(duration).toLowerCase())) {
+        throw new AppError(`Duration must be one of: ${VALID_DURATIONS.join(', ')}`, 400);
       }
     }
 
-    // Build update object
+    if (category_id) {
+      const category = await prisma.category.findUnique({ where: { id: category_id } });
+      if (!category) {
+        throw new AppError('Category not found', 404);
+      }
+    }
+
     const updateData = {};
     if (name !== undefined) updateData.name = name.trim();
-    if (duration !== undefined) updateData.duration = duration;
+    if (duration !== undefined) updateData.duration = String(duration).toLowerCase();
     if (price !== undefined) updateData.price = parseFloat(price);
     if (isActive !== undefined) updateData.is_active = isActive;
+    if (category_id !== undefined) updateData.category_id = category_id || null;
 
     const updated = await prisma.membershipPlan.update({
       where: { id: planId },
       data: updateData,
+      include: planWithCategoryInclude,
     });
 
-    // Get subscriber count
     const subscriberCount = await prisma.userMembership.count({
       where: {
         plan_id: planId,
-        status: 'ACTIVE',
+        ...activeMembershipWhere(),
       },
     });
 
-    return {
-      id: updated.id,
-      name: updated.name,
-      duration: updated.duration,
-      price: parseFloat(updated.price),
-      currency: updated.currency,
-      isActive: updated.is_active,
+    return mapPlanRecord(updated, {
       subscribers: subscriberCount,
       createdAt: updated.created_at,
-    };
+    });
   } catch (error) {
     throw error;
   }
@@ -227,7 +237,7 @@ export async function deletePlan(planId) {
     const activeMemberships = await prisma.userMembership.count({
       where: {
         plan_id: planId,
-        status: 'ACTIVE',
+        ...activeMembershipWhere(),
       },
     });
 
@@ -289,7 +299,7 @@ export async function getMembershipStats() {
 
     // Total active subscribers across all plans
     const totalSubscribers = await prisma.userMembership.count({
-      where: { status: 'ACTIVE' },
+      where: activeMembershipWhere(),
     });
 
     // Monthly revenue: sum of membership payments in current month
@@ -337,7 +347,16 @@ export async function getSubscriptionHistory(page = 1, limit = 50) {
     const memberships = await prisma.userMembership.findMany({
       include: {
         user: { select: { name: true } },
-        plan: { select: { name: true, price: true, currency: true } },
+        plan: {
+          select: {
+            name: true,
+            price: true,
+            currency: true,
+            duration: true,
+            category_id: true,
+            category: { select: { name: true } },
+          },
+        },
         payment: { select: { amount: true, status: true, created_at: true } },
       },
       orderBy: { created_at: 'desc' },
@@ -347,10 +366,15 @@ export async function getSubscriptionHistory(page = 1, limit = 50) {
 
     const total = await prisma.userMembership.count();
 
-    const history = memberships.map(m => ({
+    const history = memberships.map((m) => ({
       id: m.id,
       user: m.user.name,
       plan: m.plan.name,
+      category_id: m.plan.category_id,
+      category_name: m.plan.category_id
+        ? m.plan.category?.name ?? null
+        : 'All Categories',
+      is_lifetime: isLifetimePlan(m.plan),
       amount: m.payment?.amount ? parseFloat(m.payment.amount) : parseFloat(m.plan.price),
       currency: m.plan.currency,
       date: m.payment?.created_at || m.created_at,
@@ -386,6 +410,7 @@ export async function getRevenueByPlan(dateRange = {}) {
 
     // Get all membership plans
     const plans = await prisma.membershipPlan.findMany({
+      include: planWithCategoryInclude,
       orderBy: { created_at: 'asc' },
     });
 
@@ -418,7 +443,7 @@ export async function getRevenueByPlan(dateRange = {}) {
         const subscriberCount = await prisma.userMembership.count({
           where: {
             plan_id: plan.id,
-            status: 'ACTIVE',
+            ...activeMembershipWhere(),
           },
         });
 
@@ -428,6 +453,11 @@ export async function getRevenueByPlan(dateRange = {}) {
           duration: plan.duration,
           price: parseFloat(plan.price),
           currency: plan.currency,
+          category_id: plan.category_id,
+          category_name: plan.category_id
+            ? plan.category?.name ?? null
+            : 'All Categories',
+          is_lifetime: isLifetimePlan(plan),
           revenue: parseFloat(revenue),
           subscribers: subscriberCount,
           isActive: plan.is_active,

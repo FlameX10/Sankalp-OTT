@@ -155,12 +155,21 @@ async function confirmImageUpload(type, entityId, objectName) {
 
 // Get presigned streaming URL for an episode
 async function getPlayUrl(episodeId, { userId = null, isGuest = false } = {}) {
-  const episode = await prisma.episode.findUnique({ where: { id: episodeId } });
+  const episode = await prisma.episode.findUnique({
+    where: { id: episodeId },
+    include: { show: { select: { category_id: true } } },
+  });
   if (!episode) throw new AppError('Episode not found', 404);
   if (!episode.hls_master_url) throw new AppError('Video not available yet', 404);
   if (episode.status !== 'ready') throw new AppError(`Video is ${episode.status}`, 400);
 
-  const access = await checkEpisodeAccess(userId, isGuest, episode.id, episode.is_free);
+  const access = await checkEpisodeAccess(
+    userId,
+    isGuest,
+    episode.id,
+    episode.is_free,
+    episode.show?.category_id
+  );
   if (access.is_locked) {
     throw new AppError('Episode is locked', 403);
   }

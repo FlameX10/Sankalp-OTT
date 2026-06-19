@@ -2,6 +2,7 @@ import { prisma } from '../../prisma/client.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { AppError } from '../../middleware/error.middleware.js';
 import { getRevenueByPlan } from '../membership/membership.service.js';
+import { activeMembershipWhere } from '../membership/membership.helpers.js';
 import { logAdminActivity } from '../../utils/adminActivity.js';
 import { displayedViewCount } from '../user/view-count.service.js';
 
@@ -28,7 +29,7 @@ export async function getAllUsers(req, res, next) {
           isBlocked: true,
           createdAt: true,
           memberships: {
-            where: { status: 'ACTIVE' },
+            where: activeMembershipWhere(),
             orderBy: { end_date: 'desc' },
             take: 1,
             select: { end_date: true, status: true },
@@ -81,11 +82,13 @@ export async function getAllUsers(req, res, next) {
         }),
         status,
         subscription: u.memberships.length > 0
-          ? new Date(u.memberships[0].end_date).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            })
+          ? (u.memberships[0].end_date
+              ? new Date(u.memberships[0].end_date).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                })
+              : 'Lifetime')
           : '—',
       };
     });
@@ -1202,7 +1205,7 @@ export async function getAnalyticsReport(req, res, next) {
 
       // Active memberships snapshot (current, not period-scoped — a live health number)
       const activeMemberships = await prisma.userMembership.count({
-        where: { status: 'ACTIVE' },
+        where: activeMembershipWhere(),
       });
 
       reportData = [

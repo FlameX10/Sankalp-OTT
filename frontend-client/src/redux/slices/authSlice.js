@@ -10,7 +10,8 @@ const initialState = {
     role: null,
     plan: null,
     coins: null,
-    membership: null,
+    memberships: [],
+    has_all_access: false,
     accessToken: null,
     isInitializing: false,
     error: null,
@@ -422,10 +423,11 @@ const authSlice = createSlice({
       state.plan = action.payload;
     },
     patchUserProfile(state, action) {
-      const { plan, coins, membership } = action.payload || {};
+      const { plan, coins, memberships, has_all_access } = action.payload || {};
       if (plan !== undefined) state.plan = plan;
       if (coins !== undefined) state.coins = coins;
-      if (membership !== undefined) state.membership = membership;
+      if (memberships !== undefined) state.memberships = memberships;
+      if (has_all_access !== undefined) state.has_all_access = has_all_access;
     },
     setPendingRegistration(state, action) {
       state.pendingRegistration = action.payload || null;
@@ -440,7 +442,8 @@ const authSlice = createSlice({
       state.role = null;
       state.plan = null;
       state.coins = null;
-      state.membership = null;
+      state.memberships = [];
+      state.has_all_access = false;
       state.accessToken = null;
       state.error = null;
       state.status = 'idle';
@@ -484,7 +487,8 @@ const authSlice = createSlice({
           state.role = action.payload.user.role;
           state.plan = action.payload.user.plan;
           state.coins = action.payload.user.coins;
-          state.membership = action.payload.user.membership ?? null;
+          state.memberships = action.payload.user.memberships ?? [];
+          state.has_all_access = action.payload.user.has_all_access ?? false;
           state.status = 'succeeded';
           state.isLoading = false;
         }
@@ -580,7 +584,8 @@ const authSlice = createSlice({
         state.role = action.payload.user.role;
         state.plan = action.payload.user.plan;
         state.coins = action.payload.user.coins;
-        state.membership = action.payload.user.membership ?? null;
+        state.memberships = action.payload.user.memberships ?? [];
+        state.has_all_access = action.payload.user.has_all_access ?? false;
         state.status = 'succeeded';
         state.isLoading = false;
       })
@@ -607,7 +612,8 @@ const authSlice = createSlice({
             state.role = action.payload.user.role;
             state.plan = action.payload.user.plan;
             state.coins = action.payload.user.coins;
-            state.membership = action.payload.user.membership ?? null;
+            state.memberships = action.payload.user.memberships ?? [];
+          state.has_all_access = action.payload.user.has_all_access ?? false;
           }
           if (action.payload.pendingRegistration) {
             state.pendingRegistration = action.payload.pendingRegistration;
@@ -635,6 +641,8 @@ const authSlice = createSlice({
         state.role = null;
         state.plan = null;
         state.coins = null;
+        state.memberships = [];
+        state.has_all_access = false;
         state.accessToken = null;
         // refreshToken cleared from SecureStore by authService
         state.logout.error = null;

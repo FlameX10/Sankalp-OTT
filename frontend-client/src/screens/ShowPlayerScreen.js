@@ -76,8 +76,9 @@ export default function ShowPlayerScreen({ navigation }) {
 
   const [itemHeight, setItemHeight] = useState(SCREEN_HEIGHT);
   const onScreenLayout = useCallback((e) => {
-    const h = e.nativeEvent.layout.height;
-    if (h > 0) setItemHeight(h);
+    const { width, height } = e.nativeEvent.layout;
+    // Only capture portrait height — keeps FlatList layout stable during landscape playback
+    if (height > 0 && height >= width) setItemHeight(height);
   }, []);
 
   const episodes = useSelector(selectShowPlayerEpisodes);

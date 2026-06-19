@@ -83,6 +83,8 @@ export default function ShortVideoReelItem({
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const landscapeWidth = Math.max(windowWidth, windowHeight);
+  const landscapeHeight = Math.min(windowWidth, windowHeight);
 
   const { status } = useCaptureProtection();
 
@@ -197,7 +199,7 @@ export default function ShortVideoReelItem({
     isActive: isActive && !isLocked && firstFrameReady,
     enabled: enableLandscapeMode,
   });
-  const videoResizeMode = isLandscapeActive ? 'contain' : 'cover';
+  const videoResizeMode = 'cover';
   const showPortraitChrome = !isLandscapeActive;
   const showLandscapeToggle = enableLandscapeMode
     && showPortraitChrome
@@ -430,9 +432,12 @@ export default function ShortVideoReelItem({
   return (
     <View style={[
       styles.reelContainer,
-      { width: windowWidth },
-      itemHeight ? { height: itemHeight } : { height: layoutHeight },
-      isLandscapeActive ? { backgroundColor: '#000' } : null,
+      isLandscapeActive
+        ? { width: landscapeWidth, height: landscapeHeight, backgroundColor: '#000' }
+        : [
+            { width: windowWidth },
+            itemHeight ? { height: itemHeight } : { height: layoutHeight },
+          ],
     ]}>
       {/* Thumbnail / blurred placeholder */}
       {item.thumbnail_url ? (
@@ -475,16 +480,21 @@ export default function ShortVideoReelItem({
                 setVideoError(String(msg));
               }}
               allowsExternalPlayback={false}
+              preventsDisplaySleepDuringVideoPlayback={true}
             />
           </View>
         ) : (
           //console.log(`🎬 NON-OTT MODE (showOttOverlayControls=false) - Episode: ${item.episode_num}, resizeMode: contain`),
           <TouchableWithoutFeedback onPress={handleNonOttVideoPress}>
             <View
-              style={[
-                styles.dramaVideoFrame,
-                { top: dramaVideoTop, height: dramaVideoHeight },
-              ]}
+              style={
+                isLandscapeActive
+                  ? [StyleSheet.absoluteFill, { backgroundColor: '#000' }]
+                  : [
+                      styles.dramaVideoFrame,
+                      { top: dramaVideoTop, height: dramaVideoHeight },
+                    ]
+              }
             >
               <Video
                 key={item.episode_id}
@@ -511,6 +521,7 @@ export default function ShortVideoReelItem({
                   setVideoError(String(msg));
                 }}
                 allowsExternalPlayback={false}
+                preventsDisplaySleepDuringVideoPlayback={true}
               />
             </View>
           </TouchableWithoutFeedback>

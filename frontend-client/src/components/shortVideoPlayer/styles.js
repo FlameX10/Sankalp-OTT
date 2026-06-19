@@ -474,7 +474,7 @@ export const styles = StyleSheet.create({
   landscapeChromeRoot: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 40,
-    backgroundColor: '#000',
+    backgroundColor: 'transparent',
     justifyContent: 'space-between',
   },
   landscapeTapZone: {

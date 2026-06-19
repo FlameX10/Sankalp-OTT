@@ -73,8 +73,9 @@ export default function ForYouScreen() {
   const [viewportHeight, setViewportHeight] = useState(SCREEN_HEIGHT);
 
   const onScreenLayout = useCallback((e) => {
-    const h = e.nativeEvent.layout.height;
-    if (h > 0) setViewportHeight(h);
+    const { width, height } = e.nativeEvent.layout;
+    // Only capture portrait height — keeps FlatList layout stable during landscape playback
+    if (height > 0 && height >= width) setViewportHeight(height);
   }, []);
 
   useEffect(() => {

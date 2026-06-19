@@ -430,9 +430,12 @@ export default function ShortVideoReelItem({
   return (
     <View style={[
       styles.reelContainer,
-      { width: windowWidth },
-      itemHeight ? { height: itemHeight } : { height: layoutHeight },
-      isLandscapeActive ? { backgroundColor: '#000' } : null,
+      isLandscapeActive
+        ? { width: windowWidth, height: windowHeight, backgroundColor: '#000' }
+        : [
+            { width: windowWidth },
+            itemHeight ? { height: itemHeight } : { height: layoutHeight },
+          ],
     ]}>
       {/* Thumbnail / blurred placeholder */}
       {item.thumbnail_url ? (
@@ -481,10 +484,14 @@ export default function ShortVideoReelItem({
           //console.log(`🎬 NON-OTT MODE (showOttOverlayControls=false) - Episode: ${item.episode_num}, resizeMode: contain`),
           <TouchableWithoutFeedback onPress={handleNonOttVideoPress}>
             <View
-              style={[
-                styles.dramaVideoFrame,
-                { top: dramaVideoTop, height: dramaVideoHeight },
-              ]}
+              style={
+                isLandscapeActive
+                  ? [StyleSheet.absoluteFill, { backgroundColor: '#000' }]
+                  : [
+                      styles.dramaVideoFrame,
+                      { top: dramaVideoTop, height: dramaVideoHeight },
+                    ]
+              }
             >
               <Video
                 key={item.episode_id}
